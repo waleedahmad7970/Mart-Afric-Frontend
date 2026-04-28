@@ -10,7 +10,7 @@ import { CartProvider } from "@/context/CartContext";
 
 import SiteLayout from "@/components/layout/SiteLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
-
+// 
 import Home from "./pages/Home";
 // import Shop from "./pages/Shop";
 // import ProductDetail from "./pages/ProductDetail";
