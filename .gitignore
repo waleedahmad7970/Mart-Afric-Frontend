@@ -30,4 +30,3 @@ src/pages/*
 
 # BUT allow Home.jsx
 !src/pages/Home.jsx
-!src/pages/NotFound.tsx

@@ -23,7 +23,7 @@ import Home from "./pages/Home";
 // import Journal from "./pages/Journal";
 // import Login from "./pages/Login";
 // import Signup from "./pages/Signup";
-import NotFound from "./pages/NotFound";
+// import NotFound from "./pages/NotFound";
 
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -74,7 +74,7 @@ const App = () => (
                   <Route path="recommendations" element={<AdminRecommendations />} />
                 </Route>
 
-                <Route path="*" element={<NotFound />} />
+                {/* <Route path="*" element={<NotFound />} /> */}
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
