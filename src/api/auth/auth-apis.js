@@ -1,4 +1,3 @@
-import { error } from "node:console";
 import { api } from "../https";
 
 const authApis = {
