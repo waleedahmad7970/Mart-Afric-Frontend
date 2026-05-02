@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import authApis from "../api/auth/auth-apis";
+import { handleFormikErrors } from "../helpers/helpers";
 
 const Login = () => {
   const { login } = useAuth();
@@ -24,18 +25,20 @@ const Login = () => {
     password: Yup.string().required("Password is required"),
   });
 
-  const handleSubmit = async (values, { setSubmitting }) => {
-    const [res, error] = await authApis.login({ body: values });
+  const handleSubmit = async (values, actions) => {
+    // Clear any previous status/errors
+    actions.setStatus(null);
+
+    const [res, error] = await authApis.login(values);
 
     if (error) {
-      toast.error(error.message || "Failed to login");
-      setSubmitting(false);
+      handleFormikErrors(error, actions);
+      actions.setSubmitting(false);
       return;
     }
 
     localStorage.setItem("token", res.token);
-    toast.success("Welcome back!");
-    navigate(location.state?.from || "/");
+    navigate("/");
   };
 
   return (
