@@ -66,11 +66,11 @@ http.interceptors.response.use(
     // --- UNIVERSAL ERROR TOASTS ---
     if (status === 401) {
       localStorage.removeItem("token");
-      toast.error("Session expired. Please login again.");
+      toast.error(message);
     } else if (status === 403) {
-      toast.error("You do not have permission to perform this action.");
+      toast.error(message);
     } else if (status === 500) {
-      toast.error("Server error. Please try again later.");
+      toast.error(message);
     } else if (status !== 422) {
       // We skip 422 because handleFormikErrors will show those under the inputs
       toast.error(message);
