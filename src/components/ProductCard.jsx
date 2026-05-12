@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 
 const ProductCard = ({ product }) => (
   <Link
-    to={`/product/${product.id}`}
+    to={`/product/${product?._id || product.id}`}
     className="group block animate-fade-up"
   >
     <Card className="overflow-hidden border-0 bg-secondary/40 rounded-2xl transition-smooth group-hover:shadow-elevated">
@@ -21,9 +21,13 @@ const ProductCard = ({ product }) => (
     <div className="pt-4 px-1 flex justify-between items-start gap-3">
       <div>
         <h3 className="font-display text-lg leading-tight">{product.name}</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">{product.tagline}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {product.tagline}
+        </p>
       </div>
-      <p className="text-sm font-medium tabular-nums">${product.price.toFixed(2)}</p>
+      <p className="text-sm font-medium tabular-nums">
+        ${product.price.toFixed(2)}
+      </p>
     </div>
   </Link>
 );

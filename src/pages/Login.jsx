@@ -11,7 +11,6 @@ import authApis from "../api/auth/auth-apis";
 import { handleFormikErrors } from "../helpers/helpers";
 
 const Login = () => {
-  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,8 +35,6 @@ const Login = () => {
       actions.setSubmitting(false);
       return;
     }
-
-    localStorage.setItem("token", res.token);
     navigate("/");
   };
 

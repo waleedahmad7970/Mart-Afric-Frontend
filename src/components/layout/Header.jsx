@@ -14,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useDispatch, useSelector } from "react-redux";
+import { authActions } from "../../store/slices/auth/slice";
 
 const links = [
   { to: "/", label: "Home" },
@@ -25,11 +27,13 @@ const links = [
 const Header = () => {
   const { theme, toggle } = useTheme();
   const { count } = useCart();
-  const { user, logout } = useAuth();
+  // const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
+  const { user = {} } = useSelector((state) => state.auth);
 
   const submitSearch = (e) => {
     e.preventDefault();
@@ -37,6 +41,12 @@ const Header = () => {
     navigate(`/shop?q=${encodeURIComponent(searchQ.trim())}`);
     setSearchOpen(false);
     setSearchQ("");
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    dispatch(authActions.user(null));
+    navigate("/");
   };
 
   return (

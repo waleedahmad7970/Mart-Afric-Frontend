@@ -25,3 +25,26 @@ export const handleFormikErrors = (err, formik) => {
     formik.setStatus(message);
   }
 };
+
+export const calculateTotal = (items = []) => {
+  return items?.reduce((sum, item) => {
+    const price = item?.product?.price || 0;
+    const qty = item?.quantity || 0;
+    return sum + price * qty;
+  }, 0);
+};
+
+export const updateParams = (params, setParams, newParams) => {
+  const current = Object.fromEntries(params.entries());
+
+  const updated = {
+    ...current,
+    ...newParams,
+  };
+
+  Object.keys(updated).forEach((key) => {
+    if (!updated[key]) delete updated[key];
+  });
+
+  setParams(updated);
+};

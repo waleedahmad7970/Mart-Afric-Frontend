@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Lock,
@@ -29,7 +29,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
+import { useSelector } from "react-redux";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import cartApis from "../api/cart/cart-apis";
+import ordersApis from "../api/checkout/checkout-apis";
+import checkoutApis from "../api/checkout/checkout-apis";
 const Field = ({ label, icon: Icon, ...props }) => (
   <div className="space-y-1.5">
     <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -87,7 +92,15 @@ const PAYMENT_METHODS = [
 
 const Checkout = () => {
   const { items, subtotal, clear } = useCart();
-  const { user } = useAuth();
+  const { items: cartItems, total: cartTotal } = useSelector(
+    (state) => state.cart,
+  );
+
+  const { loaders = {} } = useSelector((state) => state.loader) || {};
+  const { checkoutLoader } = loaders || {};
+
+  // const { user } = useAuth();
+  const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1);
@@ -106,57 +119,76 @@ const Checkout = () => {
   const tax = subtotal * 0.05;
   const total = subtotal + shippingCost + tax;
 
-  const [form, setForm] = useState({
-    email: user?.email || "",
-    firstName: user?.name?.split(" ")[0] || "",
-    lastName: user?.name?.split(" ")[1] || "",
-    phone: "",
-    address: "",
-    apartment: "",
-    city: "",
-    region: "Greater Accra",
-    zip: "",
-    country: "Ghana",
-    notes: "",
-    card: "",
-    cardName: "",
-    exp: "",
-    cvc: "",
-    momoNumber: "",
+  const schema = Yup.object({
+    email: Yup.string().email().required("Required"),
+    firstName: Yup.string().required("Required"),
+    address: Yup.string().required("Required"),
+    city: Yup.string().required("Required"),
+    card: Yup.string().when("payment", {
+      is: "card",
+      then: (s) => s.required("Required"),
+    }),
   });
-  const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const submit = (e) => {
-    e.preventDefault();
-    if (!form.email || !form.firstName || !form.address || !form.city) {
-      toast.error("Please complete the required fields");
-      return;
-    }
-    if (payment === "card" && (!form.card || !form.exp || !form.cvc)) {
-      toast.error("Please complete your card details");
-      return;
-    }
-    setSubmitting(true);
-    setTimeout(() => {
-      const orderId = "ORD-" + Math.floor(10000 + Math.random() * 90000);
-      const orders = JSON.parse(localStorage.getItem("sahel-orders") || "[]");
-      orders.unshift({
-        id: orderId,
-        date: new Date().toISOString().slice(0, 10),
-        status: "Processing",
-        total,
-        items,
-        customer: `${form.firstName} ${form.lastName}`.trim(),
-        email: form.email,
-      });
-      localStorage.setItem("sahel-orders", JSON.stringify(orders));
-      clear();
-      toast.success("Order placed successfully!");
-      navigate("/orders");
-    }, 1100);
-  };
+  const formik = useFormik({
+    initialValues: {
+      email: user?.email || "",
+      firstName: user?.name?.split(" ")[0] || "",
+      lastName: user?.name?.split(" ")[1] || "",
+      phone: "",
+      address: "",
+      apartment: "",
+      city: "",
+      region: "",
+      zip: "",
+      country: "",
+      notes: "",
+      card: "",
+      cardName: "",
+      exp: "",
+      cvc: "",
+      momoNumber: "",
+      payment: "card",
+    },
+    validationSchema: schema,
+    onSubmit: async (values) => {
+      const body = {
+        shipping: {
+          email: values.email,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          phone: values.phone,
+          address: values.address,
+          apartment: values.apartment,
+          city: values.city,
+          region: values.region,
+          zip: values.zip,
+          country: values.country,
+          notes: values.notes,
+        },
 
-  if (items.length === 0) {
+        payment: {
+          method: values.payment,
+          momoNumber: values.momoNumber,
+          cardLast4: values.card?.slice(-4),
+        },
+      };
+
+      const [res, error] = await checkoutApis.checkout(body, navigate);
+
+      if (error) return;
+    },
+  });
+
+  useEffect(() => {
+    const loadCart = async () => {
+      const [res, error] = await cartApis.getCart();
+    };
+
+    loadCart();
+  }, []);
+
+  if (cartItems?.length === 0) {
     return (
       <div className="container py-20 text-center">
         <p className="text-muted-foreground mb-6">Your cart is empty.</p>
@@ -231,7 +263,11 @@ const Checkout = () => {
         ))}
       </div>
 
-      <form onSubmit={submit} className="grid lg:grid-cols-3 gap-10 lg:gap-14">
+      <form
+        onSubmit={formik.handleSubmit}
+        className="grid lg:grid-cols-3 gap-10 lg:gap-14"
+      >
+        {" "}
         {/* LEFT — sections */}
         <div className="lg:col-span-2 space-y-12">
           {/* CONTACT */}
@@ -263,29 +299,48 @@ const Checkout = () => {
                 label="Email address"
                 icon={Mail}
                 type="email"
-                value={form.email}
-                onChange={update("email")}
+                name="email"
+                value={formik.values.email}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
                 required
               />
+              {formik.touched.email && formik.errors.email && (
+                <p className="text-xs text-red-500">{formik.errors.email}</p>
+              )}
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <Field
                   label="First name"
-                  value={form.firstName}
-                  onChange={update("firstName")}
+                  name="firstName"
+                  value={formik.values.firstName}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   required
                 />
+                {formik.touched.firstName && formik.errors.firstName && (
+                  <p className="text-xs text-red-500">
+                    {formik.errors.firstName}
+                  </p>
+                )}
+
                 <Field
                   label="Last name"
-                  value={form.lastName}
-                  onChange={update("lastName")}
+                  name="lastName"
+                  value={formik.values.lastName}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
               </div>
+
               <Field
                 label="Phone number"
                 type="tel"
                 placeholder="+233 …"
-                value={form.phone}
-                onChange={update("phone")}
+                name="phone"
+                value={formik.values.phone}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
               />
 
               <div className="flex items-start gap-2 mt-2">
@@ -322,38 +377,61 @@ const Checkout = () => {
             <div className="grid gap-4">
               <Field
                 label="Street address"
-                value={form.address}
-                onChange={update("address")}
+                name="address"
+                value={formik.values.address}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
                 required
               />
+              {formik.touched.address && formik.errors.address && (
+                <p className="text-xs text-red-500">{formik.errors.address}</p>
+              )}
+
               <Field
                 label="Apartment, suite, etc. (optional)"
-                value={form.apartment}
-                onChange={update("apartment")}
+                name="apartment"
+                value={formik.values.apartment}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
               />
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <Field
                   label="City"
-                  value={form.city}
-                  onChange={update("city")}
+                  name="city"
+                  value={formik.values.city}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   required
                 />
+                {formik.touched.city && formik.errors.city && (
+                  <p className="text-xs text-red-500">{formik.errors.city}</p>
+                )}
+
                 <Field
                   label="Region / State"
-                  value={form.region}
-                  onChange={update("region")}
+                  name="region"
+                  value={formik.values.region}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
               </div>
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <Field
                   label="Postal code"
-                  value={form.zip}
-                  onChange={update("zip")}
+                  name="zip"
+                  value={formik.values.zip}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
+
                 <Field
                   label="Country"
-                  value={form.country}
-                  onChange={update("country")}
+                  name="country"
+                  value={formik.values.country}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
               </div>
 
@@ -361,10 +439,13 @@ const Checkout = () => {
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">
                   Delivery notes (optional)
                 </Label>
+
                 <Textarea
+                  name="notes"
                   placeholder="Gate code, landmark or instructions for the courier…"
-                  value={form.notes}
-                  onChange={update("notes")}
+                  value={formik.values.notes}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   className="rounded-xl resize-none"
                   rows={3}
                 />
@@ -477,32 +558,42 @@ const Checkout = () => {
                 );
               })}
             </RadioGroup>
-
             {payment === "card" && (
               <div className="grid gap-4">
                 <Field
                   label="Card number"
+                  name="card"
                   placeholder="•••• •••• •••• ••••"
-                  value={form.card}
-                  onChange={update("card")}
+                  value={formik.values.card}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
+
                 <Field
                   label="Name on card"
-                  value={form.cardName}
-                  onChange={update("cardName")}
+                  name="cardName"
+                  value={formik.values.cardName}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
+
                 <div className="grid grid-cols-2 gap-4">
                   <Field
                     label="Expiry (MM/YY)"
+                    name="exp"
                     placeholder="MM / YY"
-                    value={form.exp}
-                    onChange={update("exp")}
+                    value={formik.values.exp}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                   />
+
                   <Field
                     label="CVC"
+                    name="cvc"
                     placeholder="•••"
-                    value={form.cvc}
-                    onChange={update("cvc")}
+                    value={formik.values.cvc}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                   />
                 </div>
               </div>
@@ -512,13 +603,16 @@ const Checkout = () => {
               <div className="grid gap-4">
                 <Field
                   label="Mobile money number"
+                  name="momoNumber"
                   placeholder="+233 …"
-                  value={form.momoNumber}
-                  onChange={update("momoNumber")}
+                  value={formik.values.momoNumber}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
+
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Info className="h-3.5 w-3.5" /> You'll receive a prompt on
-                  your phone to confirm payment.
+                  <Info className="h-3.5 w-3.5" />
+                  You'll receive a prompt on your phone to confirm payment.
                 </p>
               </div>
             )}
@@ -566,7 +660,6 @@ const Checkout = () => {
             </div>
           </section>
         </div>
-
         {/* RIGHT — sticky summary */}
         <aside className="lg:sticky lg:top-24 h-fit space-y-5">
           <div className="rounded-3xl bg-card border border-border p-6 md:p-7 shadow-elevated">
@@ -606,12 +699,12 @@ const Checkout = () => {
             <div className="border-t border-border pt-5 space-y-2.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="tabular-nums">${subtotal.toFixed(2)}</span>
+                <span className="tabular-nums">${cartTotal?.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
                 <span className="tabular-nums">
-                  {shippingCost === 0 ? "Free" : `$${shippingCost.toFixed(2)}`}
+                  {shippingCost === 0 ? "Free" : `$${shippingCost?.toFixed(2)}`}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -620,13 +713,14 @@ const Checkout = () => {
               </div>
               <div className="flex justify-between font-display text-2xl pt-4 border-t border-border mt-3">
                 <span>Total</span>
-                <span className="tabular-nums">${total.toFixed(2)}</span>
+                <span className="tabular-nums">${cartTotal?.toFixed(2)}</span>
               </div>
             </div>
 
             <Button
               type="submit"
               disabled={submitting}
+              loading={checkoutLoader}
               className="w-full mt-6 rounded-full h-13 py-6 bg-gradient-warm text-primary-foreground shadow-glow text-base"
             >
               {submitting ? (

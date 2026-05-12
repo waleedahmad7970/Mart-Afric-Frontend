@@ -5,8 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { ThemeProvider } from "@/context/ThemeContext";
-import { AuthProvider } from "@/context/AuthContext";
-import { CartProvider } from "@/context/CartContext";
+
 
 import SiteLayout from "@/components/layout/SiteLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -31,14 +30,20 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminRecommendations from "./pages/admin/AdminRecommendations";
-
+import { useDispatch } from "react-redux";
+import { useEffect } from "react";
+import { authActions } from "@/store/slices/auth/slice"; 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
+const App = () => {
+ const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(authActions.hydrateUser());
+  }, []);
+  
+  return (<QueryClientProvider client={queryClient}>
     <ThemeProvider>
-      <AuthProvider>
-        <CartProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -46,8 +51,17 @@ const App = () => (
               <Routes>
                 <Route element={<SiteLayout />}>
                   <Route path="/" element={<Home />} />
-                   <Route path="/login" element={<Login />} />
+                     <Route path="/shop" element={<Shop />} />
+                  <Route path="/product/:id" element={<ProductDetail />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/faq" element={<Faq />} />
+                  <Route path="/journal" element={<Journal />} />
+                  <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
+                  <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+                  <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                 
                 </Route>
 
@@ -70,10 +84,8 @@ const App = () => (
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
-        </CartProvider>
-      </AuthProvider>
     </ThemeProvider>
-  </QueryClientProvider>
-);
+  </QueryClientProvider>)
+  }
 
 export default App;

@@ -12,6 +12,8 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
+import { useDispatch, useSelector } from "react-redux";
+import { authActions } from "../../store/slices/auth/slice";
 
 const nav = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -22,7 +24,9 @@ const nav = [
 ];
 
 const AdminLayout = () => {
-  const { user, logout } = useAuth();
+  const { user } = useSelector((state) => state.auth) || {};
+  const logout = () => {};
+  const dispatch = useDispatch();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
 
@@ -64,7 +68,7 @@ const AdminLayout = () => {
             size="sm"
             className="w-full mt-3 rounded-full"
             onClick={() => {
-              logout();
+              dispatch(authActions.logout());
               navigate("/");
             }}
           >

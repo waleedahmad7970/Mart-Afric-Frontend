@@ -17,13 +17,14 @@ import {
  *   - pass `_override={ items, chip, Icon }` to render a preset list.
  */
 const AiSuggestions = ({
-  seeds = [],
+  fetcher = null, // <-- NEW
   limit = 8,
   title = "Picked for you",
   subtitle,
   _override = null,
+  seeds = [],
 }) => {
-  const [items, setItems] = useState(_override?.items || []);
+  const [items, setItems] = useState(_override?.items || seeds || []);
   const [loading, setLoading] = useState(!_override);
 
   useEffect(() => {
@@ -32,15 +33,17 @@ const AiSuggestions = ({
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const t = setTimeout(() => {
-      setItems(getSuggestions(seeds, limit));
-      setLoading(false);
-    }, 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(seeds.map((s) => s.id)), limit, _override?.items?.length]);
 
+    if (!fetcher) return;
+
+    setLoading(true);
+
+    fetcher(limit)
+      .then((products) => {
+        setItems(products || []);
+      })
+      .finally(() => setLoading(false));
+  }, [fetcher, limit, _override]);
   if (!loading && items.length === 0) return null;
 
   const ChipIcon = _override?.Icon || Sparkles;
@@ -56,7 +59,9 @@ const AiSuggestions = ({
               {chipLabel}
             </div>
             <h2 className="font-display text-3xl md:text-4xl">{title}</h2>
-            {subtitle && <p className="text-muted-foreground mt-2 max-w-xl">{subtitle}</p>}
+            {subtitle && (
+              <p className="text-muted-foreground mt-2 max-w-xl">{subtitle}</p>
+            )}
           </div>
           <div className="hidden sm:flex items-center gap-2 relative">
             <CarouselPrevious className="static translate-y-0 h-10 w-10" />
@@ -92,4 +97,3 @@ const AiSuggestions = ({
 };
 
 export default AiSuggestions;
-

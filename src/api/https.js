@@ -5,6 +5,7 @@ import { toast } from "sonner";
  * Axios Instance
  */
 const http = axios.create({
+  timeout: 20000,
   baseURL: import.meta.env.VITE_API_URL,
   headers: {
     "Content-Type": "application/json",
@@ -60,21 +61,23 @@ http.interceptors.response.use(
     const status = error.response?.status;
     const data = error.response?.data;
     const message = data?.message || error.message || "Something went wrong";
+    const isLoginRequest = error.config?.url?.includes("/auth/login"); // Check if it's login
 
     console.error(`❌ API Error ${status || ""}:`, data || error.message);
 
-    // --- UNIVERSAL ERROR TOASTS ---
     if (status === 401) {
-      localStorage.removeItem("token");
-      toast.error(message);
+      // ONLY remove token if it's NOT the login request failing
+      if (!isLoginRequest) {
+        localStorage.removeItem("token");
+        toast.error("Session expired. Please login again.");
+      } else {
+        // If login fails, just show the error, don't clear storage
+        toast.error(message || "Invalid credentials");
+      }
     } else if (status === 403) {
       toast.error(message);
-    } else if (status === 500) {
-      toast.error(message);
-    } else if (status !== 422) {
-      // We skip 422 because handleFormikErrors will show those under the inputs
-      toast.error(message);
     }
+    // ... rest of your error logic
 
     return Promise.reject(error);
   },
@@ -85,7 +88,7 @@ http.interceptors.response.use(
  */
 const wrap = (promise) =>
   promise
-    .then((res) => [res.data, null])
+    .then((res) => [res, null])
     .catch((err) => [
       null,
       err.response?.data || err.message || "Something went wrong",
@@ -99,6 +102,7 @@ export const api = {
   post: (url, data, config) => wrap(http.post(url, data, config)),
   put: (url, data, config) => wrap(http.put(url, data, config)),
   delete: (url, config) => wrap(http.delete(url, config)),
+  patch: (url, data, config) => wrap(http.patch(url, data, config)),
 };
 
 export default http;

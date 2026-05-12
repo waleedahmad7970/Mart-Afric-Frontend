@@ -14,14 +14,55 @@ import { faqItems } from "@/components/FaqAccordion";
 import AiSuggestions from "@/components/AiSuggestions";
 import PersonalizedRails from "@/components/PersonalizedRails";
 import { products, categories } from "@/data/products";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { categoriesActions } from "../store/slices/categories/slice";
+import categoriesApis from "../api/categories/categories-apis";
+import CategorySkeleton from "../components/skeletons/categories-skelton";
+import productsApis from "../api/products/products-apis";
+import AIChat from "../components/ui/ai-chat";
+import ProductCardSkeleton from "../components/skeletons/product-skeleton";
 
 const Home = () => {
   const featured = products.slice(0, 4);
   const bestsellers = products.slice(4, 8);
+  const dispatch = useDispatch();
 
+  const { categories = [] } = useSelector((state) => state.categories);
+  const { loaders = {} } = useSelector((state) => state.loader) || {};
+  const {
+    bestSellers = [],
+    featuredProducts = [],
+    trendingsProducts = [],
+  } = useSelector((state) => state.products) || {};
+
+  const { categoriesLoader, featuredLoader, bestSellerLoader } = loaders || {};
+  useEffect(() => {
+    categoriesApis.getAllCategories().then(([res, error]) => {});
+    productsApis.getBestSellers().then(([res, error]) => {});
+    productsApis.trendingProducts().then(([res, error]) => {});
+    productsApis.featuredProducts().then(([res, error]) => {});
+  }, []);
+
+  const featuredProductGrid = ({ products, loading }) => {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        {loading
+          ? // Show 8 skeletons while loading
+            Array.from({ length: 8 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))
+          : // Show actual products
+            products.map((product) => (
+              <ProductCard key={product._id} product={product} />
+            ))}
+      </div>
+    );
+  };
   return (
     <div>
       <HeroSlider />
+      <AIChat />
 
       {/* VALUE PROPS */}
       <section className="border-y border-border/60 bg-secondary/30">
@@ -71,26 +112,33 @@ const Home = () => {
             View all <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {categories.map((c, i) => (
-            <Link
-              key={c.slug}
-              to={`/shop?cat=${c.slug}`}
-              className="group relative overflow-hidden rounded-2xl bg-gradient-sheen p-8 h-44 flex flex-col justify-between transition-smooth hover:shadow-elevated"
-            >
-              <p className="text-xs text-muted-foreground tabular-nums">
-                0{i + 1}
-              </p>
-              <div>
-                <h3 className="font-display text-2xl">{c.name}</h3>
-                <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1">
-                  Shop now{" "}
-                  <ArrowRight className="h-3 w-3 transition-smooth group-hover:translate-x-1" />
-                </p>
-              </div>
-            </Link>
-          ))}
-        </div>
+
+        {categoriesLoader ? (
+          <CategorySkeleton />
+        ) : (
+          <>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {categories?.map((c, i) => (
+                <Link
+                  key={c.slug}
+                  to={`/shop?cat=${c.slug}`}
+                  className="group relative overflow-hidden rounded-2xl bg-gradient-sheen p-8 h-44 flex flex-col justify-between transition-smooth hover:shadow-elevated"
+                >
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    0{i + 1}
+                  </p>
+                  <div>
+                    <h3 className="font-display text-2xl">{c.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1">
+                      Shop now{" "}
+                      <ArrowRight className="h-3 w-3 transition-smooth group-hover:translate-x-1" />
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
       {/* FEATURED */}
@@ -105,12 +153,12 @@ const Home = () => {
             </h2>
           </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-10">
-          {featured.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        {featuredProductGrid({
+          products: featuredProducts?.slice(0, 4),
+          loading: featuredLoader,
+        })}
       </section>
+      {/* FEATURED Dynmaic */}
 
       {/* PROMO BANNERS */}
       <PromoBanner />
@@ -131,11 +179,10 @@ const Home = () => {
             View all <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-10">
-          {bestsellers.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        {featuredProductGrid({
+          products: bestSellers?.slice(0, 4),
+          loading: bestSellerLoader,
+        })}
       </section>
 
       {/* AI RECOMMENDATIONS — multi-rail, personalized */}
