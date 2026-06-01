@@ -434,7 +434,6 @@ const UserModal = ({ open, setOpen, data = {}, onSuccess }) => {
         resetForm();
         setPreview(null); // Clear preview on success
       } catch (error) {
-        toast.error(error?.response?.data?.message || "Something went wrong");
       } finally {
         setSubmitting(false);
       }
@@ -462,7 +461,6 @@ const UserModal = ({ open, setOpen, data = {}, onSuccess }) => {
         setPreview(formik.values.avatar); // Revert to previous avatar if failed
       }
     } catch (err) {
-      toast.error("Something went wrong during upload");
       setPreview(formik.values.avatar);
     } finally {
       setIsUploadingImage(false);

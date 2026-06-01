@@ -62,7 +62,6 @@ const UserProfile = () => {
           dispatch(authActions.setUser(res.data.user)); // Update Redux state
         }
       } catch (err) {
-        toast.error("Something went wrong");
       } finally {
         setSubmitting(false);
       }
@@ -100,7 +99,6 @@ const UserProfile = () => {
           resetForm();
         }
       } catch (err) {
-        toast.error("Something went wrong", err);
         handleFormikErrors(err);
       } finally {
         setSubmitting(false);
@@ -132,7 +130,6 @@ const UserProfile = () => {
         setPreview(profileFormik.values.avatar);
       }
     } catch (err) {
-      toast.error("Something went wrong during upload");
       setPreview(profileFormik.values.avatar);
     } finally {
       setIsUploadingImage(false);
@@ -140,7 +137,7 @@ const UserProfile = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-10 pb-10">
+    <div className="max-w-7xl px-[20px] mx-auto space-y-10 pb-10">
       {/* HEADER */}
       <div>
         <p className="pt-5 text-xs uppercase tracking-widest text-muted-foreground mb-1">

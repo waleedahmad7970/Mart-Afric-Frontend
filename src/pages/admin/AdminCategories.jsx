@@ -452,8 +452,6 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
     }
   };
 
-  console.log("Formik values:", formik.values);
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[425px]">
