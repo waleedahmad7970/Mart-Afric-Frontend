@@ -62,6 +62,12 @@ const productSlice = createSlice({
     setSmartSearch: (state, action) => {
       state.smartSearch = action.payload;
     },
+    deleteProductsFromList: (state, action) => {
+      console.log("acton", action.payload);
+      state.products = state.products.filter(
+        (product) => product._id !== action.payload,
+      );
+    },
     resetProducts: (state) => {
       state.products = [];
       state.productsPagination = {

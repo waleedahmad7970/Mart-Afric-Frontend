@@ -34,6 +34,13 @@ export const calculateTotal = (items = []) => {
   }, 0);
 };
 
+export const calculateTotalItems = (items = []) => {
+  return items?.reduce((sum, item) => {
+    const qty = item?.quantity || 0;
+    return sum + qty;
+  }, 0);
+};
+
 export const updateParams = (params, setParams, newParams) => {
   const current = Object.fromEntries(params.entries());
 

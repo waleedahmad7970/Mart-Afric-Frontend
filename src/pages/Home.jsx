@@ -22,6 +22,14 @@ import CategorySkeleton from "../components/skeletons/categories-skelton";
 import productsApis from "../api/products/products-apis";
 import AIChat from "../components/ui/ai-chat";
 import ProductCardSkeleton from "../components/skeletons/product-skeleton";
+import wishlistApis from "../api/wishlist/wishlist-apis";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 const Home = () => {
   const featured = products.slice(0, 4);
@@ -35,14 +43,30 @@ const Home = () => {
     featuredProducts = [],
     trendingsProducts = [],
   } = useSelector((state) => state.products) || {};
+  const {
+    wishlist = null,
+    items = [],
+    total = 0,
+  } = useSelector((state) => state.wishlist) || {};
 
   const { categoriesLoader, featuredLoader, bestSellerLoader } = loaders || {};
+
+  const isWishlisted = (productId) => {
+    const wishlistedItemIds = items?.map((item) => item?.product?._id);
+    return wishlistedItemIds?.includes(productId);
+  };
+
   useEffect(() => {
     categoriesApis.getAllCategories().then(([res, error]) => {});
+    categoriesApis.getSubCategories().then(([res, error]) => {});
     productsApis.getBestSellers().then(([res, error]) => {});
     productsApis.trendingProducts().then(([res, error]) => {});
     productsApis.featuredProducts().then(([res, error]) => {});
   }, []);
+
+  const onToggleWishlist = async (productId) => {
+    const [res, error] = await wishlistApis.toggleWishlist(productId);
+  };
 
   const featuredProductGrid = ({ products, loading }) => {
     return (
@@ -54,7 +78,12 @@ const Home = () => {
             ))
           : // Show actual products
             products.map((product) => (
-              <ProductCard key={product._id} product={product} />
+              <ProductCard
+                key={product._id}
+                product={product}
+                isWishlisted={isWishlisted(product._id)}
+                onToggleWishlist={onToggleWishlist}
+              />
             ))}
       </div>
     );
@@ -140,7 +169,72 @@ const Home = () => {
           </>
         )}
       </section>
+      {/* CATEGORIES - MODERN SLIDER */}
+      <section className="container py-20 lg:py-28">
+        <div className="flex items-end justify-between mb-8">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">
+              Departments
+            </p>
+            <h2 className="font-display text-3xl md:text-5xl">
+              Shop every aisle
+            </h2>
+          </div>
+          <Link
+            to="/shop"
+            className="text-sm font-medium hover:text-primary hidden md:inline-flex items-center gap-1 transition-colors"
+          >
+            View all <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
 
+        {categoriesLoader ? (
+          <CategorySkeleton />
+        ) : (
+          <Carousel
+            opts={{ align: "start", dragFree: true }}
+            className="w-full relative group"
+          >
+            <CarouselContent className="-ml-4 md:-ml-6">
+              {categories?.map((c) => (
+                <CarouselItem
+                  key={c.slug}
+                  className="pl-4 md:pl-6 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/6"
+                >
+                  <Link
+                    to={`/shop?cat=${c.slug}`}
+                    className="group flex flex-col items-center gap-4 outline-none"
+                  >
+                    <div className="relative w-full aspect-square overflow-hidden rounded-[2rem] bg-muted/30 border border-border/50 transition-all duration-300 group-hover:shadow-elevated group-hover:border-primary/30 flex items-center justify-center">
+                      {/* Image handling - checks if category has an image, otherwise shows a clean gradient */}
+                      {c.image ? (
+                        <img
+                          src={c.image}
+                          alt={c.name}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/5 to-primary/10 transition-transform duration-500 group-hover:scale-105" />
+                      )}
+                    </div>
+                    <div className="text-center w-full">
+                      <h3 className="font-medium text-sm md:text-base text-foreground group-hover:text-primary transition-colors truncate px-2">
+                        {c.name}
+                      </h3>
+                    </div>
+                  </Link>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+
+            {/* Desktop Navigation Arrows (Visible only on hover) */}
+            <div className="hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <CarouselPrevious className="-left-5 h-12 w-12 shadow-md border-border/50 bg-background hover:bg-muted" />
+              <CarouselNext className="-right-5 h-12 w-12 shadow-md border-border/50 bg-background hover:bg-muted" />
+            </div>
+          </Carousel>
+        )}
+      </section>
       {/* FEATURED */}
       <section className="container pb-20 lg:pb-28">
         <div className="flex items-end justify-between mb-10">

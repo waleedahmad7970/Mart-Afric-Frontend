@@ -36,6 +36,20 @@ const orderSlice = createSlice({
         ...action.payload,
       };
     },
+    updateOrderStatus: (state, action) => {
+      const updatedOrder = action.payload;
+      const index = state.orders.findIndex(
+        (order) => order._id === updatedOrder._id,
+      );
+      if (index !== -1) {
+        state.orders[index] = updatedOrder;
+      } else {
+        state.orders.unshift(updatedOrder);
+      }
+      if (state.orderDetails._id === updatedOrder._id) {
+        state.orderDetails = updatedOrder;
+      }
+    },
   },
 });
 

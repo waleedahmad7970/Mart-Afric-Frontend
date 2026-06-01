@@ -25,9 +25,12 @@ const Stat = ({ icon: Icon, label, value, hint }) => (
 );
 
 const AdminDashboard = () => {
-  const { users = [] } = useSelector((state) => state.auth);
-  const { orders = [] } = useSelector((state) => state.orders);
-  const { products = [] } = useSelector((state) => state.products);
+  const {
+    user: { users = [] } = {},
+    order: { orders = [] } = {},
+    product: { products = [] } = {},
+  } = useSelector((state) => state.admin);
+
   const getTotalReevenue = () => {
     return orders?.reduce((s, o) => {
       if (o.status === "delivered") {
@@ -37,9 +40,9 @@ const AdminDashboard = () => {
     }, 0);
   };
   useEffect(() => {
-    userApi.getUsers();
-    ordersApis.getOrders();
-    productsApis.products({ limit: 1000, page: 1 });
+    userApi.getAdminUsers();
+    ordersApis.getAdminOrders();
+    productsApis.getAdminProducts({ limit: 1000, page: 1 });
   }, []);
   const revenue = seedOrders.reduce((s, o) => s + o.total, 0);
   const recentOrders = [...(orders || [])]
@@ -77,6 +80,30 @@ const AdminDashboard = () => {
         <Stat
           icon={TrendingUp}
           label="Orders"
+          value={orders?.length}
+          hint="2 pending"
+        />
+        <Stat
+          icon={DollarSign}
+          label="* Total sales"
+          value={`$${getTotalReevenue()?.toFixed(2)}`}
+          hint="+12.4% this week"
+        />
+        <Stat
+          icon={Package}
+          label="* Today’s orders"
+          value={products.length}
+          hint="2 new this month"
+        />
+        <Stat
+          icon={Users}
+          label="* Pending orders"
+          value={users?.length}
+          hint="+3 today"
+        />
+        <Stat
+          icon={TrendingUp}
+          label="* Completed orders"
           value={orders?.length}
           hint="2 pending"
         />

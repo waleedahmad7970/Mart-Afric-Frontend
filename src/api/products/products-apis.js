@@ -3,6 +3,7 @@ import { getDispatch } from "../dispatch/dispatch";
 import { uiLoaderActions } from "../../store/slices/loader/slice";
 import { productActions } from "../../store/slices/product/slice";
 import { handleFormikErrors } from "../../helpers/helpers";
+import { adminActions } from "../../store/slices/admin/slice";
 const productsApis = {
   getProduct: async (productId) => {
     const dispatch = getDispatch();
@@ -97,6 +98,73 @@ const productsApis = {
   },
 
   // admin
+  getProductsStats: async () => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("productsLoader"));
+    const [res, error] = await api.get(`/products/stats`);
+    const { success, data, message } = res?.data || {};
+
+    const stats = {
+      outOfStock: data?.outOfStock,
+      lowStock: data?.lowStock,
+      activeProducts: data?.activeProducts,
+      totalProducts: data?.totalProducts,
+      totalRevenue: data?.totalRevenue,
+      topSellingProducts: data?.topSellingProducts,
+      totalStock: data?.totalStock,
+    };
+
+    if (success) {
+      dispatch(adminActions.setProductsStats(stats));
+    }
+    dispatch(uiLoaderActions.stopLoader("productsLoader"));
+    return [res, error];
+  },
+  getAdminProducts: async ({
+    page,
+    limit,
+    search,
+    category,
+    subCategory,
+    sku,
+    brand,
+    sort,
+    stock,
+  }) => {
+    const dispatch = getDispatch();
+    let url = `/products?limit=${limit}&page=${page}`;
+
+    if (search) {
+      url += `&search=${search}`;
+    }
+    if (category) {
+      url += `&category=${category}`;
+    }
+    if (subCategory) {
+      url += `&subCategory=${subCategory}`;
+    }
+    if (sku) {
+      url += `&sku=${sku}`;
+    }
+    if (brand) {
+      url += `&brand=${brand}`;
+    }
+    if (sort) {
+      url += `&sort=${sort}`;
+    }
+    if (stock) {
+      url += `&stock=${stock}`;
+    }
+    dispatch(uiLoaderActions.startLoader("productsLoader"));
+    const [res, error] = await api.get(`${url}`);
+    const { success, data, message, meta } = res?.data || {};
+    if (success) {
+      dispatch(adminActions.setProducts(data));
+      dispatch(adminActions.setProductsPagination(meta));
+    }
+    dispatch(uiLoaderActions.stopLoader("productsLoader"));
+    return [res, error];
+  },
   uploadImage: async ({ file }) => {
     const formData = new FormData();
     formData.append("image", file);
@@ -112,10 +180,7 @@ const productsApis = {
 
     dispatch(uiLoaderActions.startLoader("uploaderLoader"));
 
-    const [res, error] = await api.patch(
-      `/products/${productId}`,
-      body, // 👈 send JSON directly
-    );
+    const [res, error] = await api.patch(`/products/${productId}`, body);
 
     dispatch(uiLoaderActions.stopLoader("uploaderLoader"));
 
@@ -157,6 +222,16 @@ const productsApis = {
 
     dispatch(uiLoaderActions.stopLoader("productsLoader"));
 
+    return [res, error];
+  },
+  deleteProduct: async ({ id }) => {
+    const [res, error] = await api.delete(`/products/${id}`);
+    const { success, data, message } = res?.data || {};
+    const dispatch = getDispatch();
+
+    if (success) {
+      dispatch(productActions.deleteProductsFromList(id));
+    }
     return [res, error];
   },
 };

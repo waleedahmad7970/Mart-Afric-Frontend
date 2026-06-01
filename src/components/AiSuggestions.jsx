@@ -9,6 +9,8 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import wishlistApis from "../api/wishlist/wishlist-apis";
+import { useSelector } from "react-redux";
 
 /**
  * AI-style "Picked for you" slider.
@@ -26,6 +28,16 @@ const AiSuggestions = ({
 }) => {
   const [items, setItems] = useState(_override?.items || seeds || []);
   const [loading, setLoading] = useState(!_override);
+
+  const {
+    wishlist = null,
+    items: wishlistItems = [],
+    total = 0,
+  } = useSelector((state) => state.wishlist) || {};
+  const isWishlisted = (productId) => {
+    const wishlistedItemIds = wishlistItems?.map((item) => item?.product?._id);
+    return wishlistedItemIds?.includes(productId);
+  };
 
   useEffect(() => {
     if (_override) {
@@ -48,7 +60,9 @@ const AiSuggestions = ({
 
   const ChipIcon = _override?.Icon || Sparkles;
   const chipLabel = _override?.chip || "AI suggestions";
-
+  const onToggleWishlist = async (productId) => {
+    const [res, error] = await wishlistApis.toggleWishlist(productId);
+  };
   return (
     <section className="mt-20">
       <Carousel opts={{ align: "start", loop: false }} className="w-full">
@@ -83,10 +97,14 @@ const AiSuggestions = ({
           <CarouselContent className="-ml-5">
             {items.map((p) => (
               <CarouselItem
-                key={p.id}
+                key={p._id}
                 className="pl-5 basis-1/2 md:basis-1/3 lg:basis-1/4"
               >
-                <ProductCard product={p} />
+                <ProductCard
+                  product={p}
+                  isWishlisted={isWishlisted(p._id)}
+                  onToggleWishlist={onToggleWishlist}
+                />
               </CarouselItem>
             ))}
           </CarouselContent>

@@ -2,6 +2,7 @@ import { api } from "../https";
 import { getDispatch } from "../dispatch/dispatch";
 import { authActions } from "../../store/slices/auth/slice";
 import { uiLoaderActions } from "../../store/slices/loader/slice";
+import { adminActions } from "../../store/slices/admin/slice";
 const userApi = {
   getUsers: async (values) => {
     const dispatch = getDispatch();
@@ -14,15 +15,48 @@ const userApi = {
     }
     return [res, error];
   },
-  getUsers: async (values) => {
+  getAdminUsers: async (values) => {
     const dispatch = getDispatch();
     dispatch(uiLoaderActions.startLoader("usersCountLoader"));
     const [res, error] = await api.get("/users");
     dispatch(uiLoaderActions.stopLoader("usersCountLoader"));
     const { success, data, message } = res?.data || {};
     if (success) {
-      dispatch(authActions.setUsers(data));
+      dispatch(adminActions.setUsers(data));
     }
+    return [res, error];
+  },
+
+  uploadAvatar: async (file) => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("uploadAvatarLoader"));
+    const formData = new FormData();
+    formData.append("avatar", file);
+    const [res, error] = await api.post("/users/me/avatar", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    dispatch(uiLoaderActions.stopLoader("uploadAvatarLoader"));
+    return [res, error];
+  },
+  updateUser: async (values) => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("updateUserLoader"));
+    const [res, error] = await api.patch(`/users/me`, values);
+    const { success, data, message } = res?.data || {};
+    if (success) {
+      dispatch(authActions.updateUser(data));
+    }
+    dispatch(uiLoaderActions.stopLoader("updateUserLoader"));
+    return [res, error];
+  },
+  updateUserPassword: async (values) => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("updatePasswordLoader"));
+    const [res, error] = await api.patch(`/users/password`, values);
+    const { success, data, message } = res?.data || {};
+    dispatch(uiLoaderActions.stopLoader("updatePasswordLoader"));
     return [res, error];
   },
 };

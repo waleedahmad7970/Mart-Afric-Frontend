@@ -8,27 +8,71 @@ import {
   Moon,
   Sun,
   Sparkles,
+  ChevronDown,
+  ChevronRight,
+  Store,
+  Layers,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { useDispatch, useSelector } from "react-redux";
 import { authActions } from "../../store/slices/auth/slice";
 
+// 1. Refactored nav array to support groups and regular links
 const nav = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/admin/products", label: "Products", icon: Package },
-  { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
-  { to: "/admin/users", label: "Users", icon: Users },
-  { to: "/admin/recommendations", label: "Recommendations", icon: Sparkles },
+  {
+    type: "link",
+    to: "/admin",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    end: true,
+  },
+
+  // NEW: Collapsible Catalog Group
+  {
+    type: "group",
+    label: "Catalog",
+    icon: Package,
+    items: [
+      { to: "/admin/products", label: "Products" },
+      { to: "/admin/categories", label: "Categories" },
+      { to: "/admin/inventory", label: "Inventory" },
+      { to: "/admin/custom-product-section", label: "Custom Sections" }, // <-- Your new page!
+    ],
+  },
+
+  { type: "link", to: "/admin/orders", label: "Orders", icon: ShoppingCart },
+  { type: "link", to: "/admin/customers", label: "Customers", icon: Users },
+
+  // NEW: Collapsible Integrations Group
+  {
+    type: "group",
+    label: "Integrations",
+    icon: Layers,
+    items: [
+      { to: "/admin/deliveroo", label: "Deliveroo" },
+      { to: "/admin/uber-eats", label: "Uber Eats" },
+      { to: "/admin/delivery", label: "Delivery" },
+    ],
+  },
 ];
 
 const AdminLayout = () => {
   const { user } = useSelector((state) => state.auth) || {};
-  const logout = () => {};
   const dispatch = useDispatch();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
+
+  // 2. State to track which sub-menus are open (default Catalog to open)
+  const [openGroups, setOpenGroups] = useState({ Catalog: true });
+
+  const toggleGroup = (label) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
+  };
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -39,29 +83,83 @@ const AdminLayout = () => {
           </Link>
           <p className="text-xs text-muted-foreground mt-0.5">Admin console</p>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
-          {nav.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-smooth ${
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "hover:bg-sidebar-accent/60"
-                }`
-              }
-            >
-              <n.icon className="h-4 w-4" />
-              {n.label}
-            </NavLink>
-          ))}
+
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+          {nav.map((n) => {
+            // Render a standard link
+            if (n.type === "link") {
+              return (
+                <NavLink
+                  key={n.to}
+                  to={n.to}
+                  end={n.end}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-smooth ${
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        : "hover:bg-sidebar-accent/60"
+                    }`
+                  }
+                >
+                  <n.icon className="h-4 w-4" />
+                  {n.label}
+                </NavLink>
+              );
+            }
+
+            // Render a collapsible group
+            if (n.type === "group") {
+              const isOpen = openGroups[n.label];
+              return (
+                <div key={n.label} className="space-y-1 pt-1">
+                  <button
+                    onClick={() => toggleGroup(n.label)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-smooth hover:bg-sidebar-accent/60 text-sidebar-foreground/80 font-medium"
+                  >
+                    <div className="flex items-center gap-3">
+                      <n.icon className="h-4 w-4" />
+                      {n.label}
+                    </div>
+                    {isOpen ? (
+                      <ChevronDown className="h-4 w-4 opacity-50" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 opacity-50" />
+                    )}
+                  </button>
+
+                  {/* The Nested Items */}
+                  {isOpen && (
+                    <div className="pl-9 pr-2 space-y-1 pb-1">
+                      {n.items.map((subItem) => (
+                        <NavLink
+                          key={subItem.to}
+                          to={subItem.to}
+                          className={({ isActive }) =>
+                            `block px-3 py-2 rounded-lg text-sm transition-smooth ${
+                              isActive
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                            }`
+                          }
+                        >
+                          {subItem.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return null;
+          })}
         </nav>
+
         <div className="p-4 border-t border-sidebar-border">
-          <p className="text-sm font-medium truncate">{user?.name}</p>
+          <p className="text-sm font-medium truncate">
+            {user?.name || "Admin User"}
+          </p>
           <p className="text-xs text-muted-foreground truncate">
-            {user?.email}
+            {user?.email || "admin@martafric.com"}
           </p>
           <Button
             variant="outline"
