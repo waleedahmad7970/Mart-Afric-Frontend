@@ -1,5 +1,4 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-// 1. IMPORT HEART ICON HERE
 import {
   Moon,
   Sun,
@@ -8,6 +7,7 @@ import {
   Search,
   Menu,
   X,
+  ArrowRight,
   Heart,
   ChevronDown,
 } from "lucide-react";
@@ -15,7 +15,6 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/context/ThemeContext";
 import { useCart } from "@/context/CartContext";
-// import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -48,14 +47,16 @@ const Header = () => {
   const { total = 0 } = useSelector((state) => state.wishlist) || {};
   const { categories = [], subCategories = [] } =
     useSelector((state) => state.categories) || {};
-  // 3. State to handle opening/closing the categories menu
+
   const [expandedCategory, setExpandedCategory] = useState(null);
   const [showCategories, setShowCategories] = useState(false);
+
   const submitSearch = (e) => {
     e.preventDefault();
     if (!searchQ.trim()) return;
     navigate(`/shop?q=${encodeURIComponent(searchQ.trim())}`);
     setSearchOpen(false);
+    setOpen(false);
     setSearchQ("");
   };
 
@@ -208,7 +209,33 @@ const Header = () => {
               side="right"
               className="w-[80%] overflow-y-auto custom-scrollbar"
             >
-              <nav className="flex flex-col gap-5 mt-8">
+              <nav className="flex flex-col gap-5 mt-6">
+                {/* NEW: Mobile Search Bar with Enter Button */}
+                <form
+                  onSubmit={submitSearch}
+                  className="relative w-full mb-4 mt-2"
+                >
+                  {/* Left Search Icon */}
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+
+                  <Input
+                    value={searchQ}
+                    onChange={(e) => setSearchQ(e.target.value)}
+                    placeholder="Search store..."
+                    className="pl-10 pr-12 w-full rounded-full bg-muted/50 border-transparent focus-visible:bg-background focus-visible:border-primary transition-colors h-10"
+                  />
+
+                  {/* Right Enter/Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={!searchQ.trim()} // Disables button if search is empty
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    aria-label="Submit Search"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </form>
+
                 {/* Standard Links */}
                 {links.map((l) => (
                   <Link
@@ -221,8 +248,7 @@ const Header = () => {
                   </Link>
                 ))}
 
-                {/* NEW: Categories Accordion */}
-                {/* NEW: Categories Accordion */}
+                {/* Categories Accordion */}
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={() => setShowCategories(!showCategories)}

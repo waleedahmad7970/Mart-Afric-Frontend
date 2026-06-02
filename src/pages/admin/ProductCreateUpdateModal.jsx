@@ -25,13 +25,17 @@ import { useSelector } from "react-redux";
 // Validation Schema
 const ProductSchema = Yup.object().shape({
   image: Yup.string().required("Image is required"),
-  name: Yup.string().required("Name is required"),
+  name: Yup.string()
+    .required("Name is required")
+    .min(20, "Name must be at least 20 characters"),
   brand: Yup.string().required("Brand is required"),
   category: Yup.string().required("Category is required"),
   subCategory: Yup.string().required("Sub-category is required"),
   price: Yup.number().min(1, "Must be positive").required("Price is required"),
   stock: Yup.number().integer().min(1).required("Stock is required"),
-  description: Yup.string().required("Description is required"),
+  description: Yup.string()
+    .required("Description is required")
+    .min(50, "Description must be at least 50 characters"),
   sku: Yup.string().required("SKU is required"),
   barcode: Yup.string().required("Barcode is required"),
   salePrice: Yup.number().min(1).required("Sale price is required"),

@@ -25,6 +25,7 @@ import { productActions } from "../store/slices/product/slice";
 import ProductCardSkeleton from "../components/skeletons/product-skeleton";
 import { updateParams } from "../helpers/helpers";
 import categoriesApis from "../api/categories/categories-apis";
+import wishlistApis from "../api/wishlist/wishlist-apis";
 
 // FIX 1: Set a static max price so the slider doesn't shrink to $0 when filtering
 const MAX_PRICE = 1000;
@@ -179,6 +180,11 @@ const Shop = () => {
   const { categories = [] } = useSelector((state) => state.categories);
   const { loaders = {} } = useSelector((state) => state.loader) || {};
   const { productsLoader } = loaders || {};
+  const {
+    wishlist = null,
+    items = [],
+    total = 0,
+  } = useSelector((state) => state.wishlist) || {};
 
   const page = productsPagination.page || 1;
   const totalPages = productsPagination.totalPages || 1;
@@ -236,12 +242,13 @@ const Shop = () => {
   useEffect(() => {
     categoriesApis.getAllCategories();
   }, []);
-  const onToggleWishlist = (productId) => {
-    // Implement the logic to add/remove from wishlist
-    // For example, you might call an API endpoint here
-    console.log("Toggling wishlist for product ID:", productId);
+  const onToggleWishlist = async (productId) => {
+    const [res, error] = await wishlistApis.toggleWishlist(productId);
   };
-
+  const isWishlisted = (productId) => {
+    const wishlistedItemIds = items?.map((item) => item?.product?._id);
+    return wishlistedItemIds?.includes(productId);
+  };
   /* ---------------- LOAD MORE ---------------- */
 
   const loadMore = () => {
@@ -399,9 +406,9 @@ const Shop = () => {
                 <div className="grid grid-cols-2 xl:grid-cols-3 gap-5 no-scrollbar">
                   {products?.map((p) => (
                     <ProductCard
-                      key={p._id}
+                      key={p?._id}
                       product={p}
-                      isWishlisted={true}
+                      isWishlisted={isWishlisted(p?._id)}
                       onToggleWishlist={onToggleWishlist}
                     />
                   ))}
