@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import * as Yup from "yup";
 // APIs
 import categoriesApis from "../../api/categories/categories-apis";
 import productsApis from "../../api/products/products-apis";
@@ -380,11 +380,9 @@ export default AdminCategories;
 const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
   const isEditing = !!data?._id;
 
-  // NEW: States for image uploading
   const [preview, setPreview] = useState(data?.image || null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // Pulling the global uploader loader (optional, matches your Product modal pattern)
   const { uploaderLoader } = useSelector(
     (state) => state.loader?.loaders || {},
   );
@@ -393,19 +391,18 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
     initialValues: {
       name: data?.name || "",
       slug: data?.slug || "",
-      image: data?.image || null, // NEW: added image field
+      image: data?.image || null,
     },
     enableReinitialize: true,
+    // NEW: Yup Validation Schema
+    validationSchema: Yup.object({
+      name: Yup.string().trim().required("Category name is required"),
+      slug: Yup.string().trim().required("Category Slug is required"),
+      image: Yup.string().required("Category image is required"),
+    }),
     onSubmit: async (values, { setSubmitting, resetForm }) => {
-      if (!values.name.trim()) {
-        toast.error("Category name is required");
-        setSubmitting(false);
-        return;
-      }
-
       try {
         if (isEditing) {
-          // Note: ensure your update API handles the 'values' object structure correctly
           await categoriesApis.updateCategory({ id: data._id, values });
           toast.success("Category updated successfully");
         } else {
@@ -415,8 +412,9 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
         onSuccess();
         setOpen(false);
         resetForm();
-        setPreview(null); // Reset preview on success
+        setPreview(null);
       } catch (error) {
+        // Keep toast ONLY for actual server/API errors
         toast.error(error?.response?.data?.message || "Something went wrong");
       } finally {
         setSubmitting(false);
@@ -424,17 +422,14 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
     },
   });
 
-  // NEW: Function to handle the S3 Upload
   const handleThumbnailUpload = async (event, setFieldValue) => {
     const file = event.currentTarget.files[0];
     if (!file) return;
 
-    // Optimistically set the preview
     setPreview(URL.createObjectURL(file));
     setIsUploadingImage(true);
 
     try {
-      // Re-using the same upload function from your products API
       const [res, error] = await productsApis.uploadImage({ file });
       const { success, url } = res?.data || {};
 
@@ -442,7 +437,7 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
         setFieldValue("image", url);
       } else {
         toast.error("Image upload failed");
-        setPreview(formik.values.image); // Revert to previous image if failed
+        setPreview(formik.values.image);
       }
     } catch (err) {
       toast.error("Something went wrong during upload");
@@ -462,7 +457,6 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
         </DialogHeader>
 
         <form onSubmit={formik.handleSubmit} className="space-y-4 py-4">
-          {/* NEW: Media Upload Section */}
           <div className="space-y-2">
             <Label>Category Image</Label>
             <div
@@ -507,9 +501,12 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
                 }
               />
             </div>
+            {/* Display image error if you ever decide to make it required */}
+            {formik.touched.image && formik.errors.image && (
+              <p className="text-xs text-red-500 mt-1">{formik.errors.image}</p>
+            )}
           </div>
 
-          {/* Original Form Fields */}
           <div className="space-y-2">
             <Label htmlFor="cat_name">Category Name</Label>
             <Input
@@ -518,8 +515,13 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
               placeholder="e.g. Body Care"
               value={formik.values.name}
               onChange={formik.handleChange}
+              onBlur={formik.handleBlur} // Important for touched state
               disabled={formik.isSubmitting}
             />
+            {/* NEW: Inline Error Display */}
+            {formik.touched.name && formik.errors.name && (
+              <p className="text-xs text-red-500 mt-1">{formik.errors.name}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -530,11 +532,16 @@ const CategoryModal = ({ open, setOpen, data = {}, onSuccess }) => {
               placeholder="e.g. body-care"
               value={formik.values.slug}
               onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
               disabled={formik.isSubmitting}
             />
             <p className="text-xs text-muted-foreground">
               Leave blank to automatically generate from the name.
             </p>
+            {/* NEW: Inline Error Display */}
+            {formik.touched.slug && formik.errors.slug && (
+              <p className="text-xs text-red-500 mt-1">{formik.errors.slug}</p>
+            )}
           </div>
 
           <DialogFooter>
@@ -581,18 +588,13 @@ const SubCategoryModal = ({
       category: data?.category?._id || data?.category || "",
     },
     enableReinitialize: true,
+    // NEW: Yup Validation Schema
+    validationSchema: Yup.object({
+      category: Yup.string().required("Please select a parent category"),
+      name: Yup.string().trim().required("Sub-category name is required"),
+      slug: Yup.string().trim().required("Sub-category slug is required"),
+    }),
     onSubmit: async (values, { setSubmitting, resetForm }) => {
-      if (!values.category) {
-        toast.error("Please select a parent category");
-        setSubmitting(false);
-        return;
-      }
-      if (!values.name.trim()) {
-        toast.error("Sub-category name is required");
-        setSubmitting(false);
-        return;
-      }
-
       try {
         if (isEditing) {
           await categoriesApis.updateSubCategory({ id: data._id, ...values });
@@ -610,6 +612,12 @@ const SubCategoryModal = ({
     },
   });
 
+  console.log("values", {
+    va: formik.values,
+    err: formik.errors,
+    touched: formik.touched,
+  });
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[425px]">
@@ -623,7 +631,10 @@ const SubCategoryModal = ({
             <Label>Parent Category</Label>
             <Select
               value={formik.values.category}
-              onValueChange={(val) => formik.setFieldValue("category", val)}
+              onValueChange={(val) => {
+                formik.setFieldValue("category", val);
+                formik.setFieldTouched("category", true); // Important for Select components
+              }}
               disabled={formik.isSubmitting}
             >
               <SelectTrigger>
@@ -641,7 +652,14 @@ const SubCategoryModal = ({
                 ))}
               </SelectContent>
             </Select>
+            {/* NEW: Inline Error Display */}
+            {formik.touched.category && formik.errors.category && (
+              <p className="text-xs text-red-500 mt-1">
+                {formik.errors.category}
+              </p>
+            )}
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="sub_name">Sub-Category Name</Label>
             <Input
@@ -650,9 +668,15 @@ const SubCategoryModal = ({
               placeholder="e.g. Lotions"
               value={formik.values.name}
               onChange={formik.handleChange}
+              onBlur={formik.handleBlur} // Important for touched state
               disabled={formik.isSubmitting}
             />
+            {/* NEW: Inline Error Display */}
+            {formik.touched.name && formik.errors.name && (
+              <p className="text-xs text-red-500 mt-1">{formik.errors.name}</p>
+            )}
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="sub_slug">Custom URL Slug (Optional)</Label>
             <Input
@@ -661,9 +685,14 @@ const SubCategoryModal = ({
               placeholder="e.g. lotions"
               value={formik.values.slug}
               onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
               disabled={formik.isSubmitting}
             />
+            {formik.touched.slug && formik.errors.slug && (
+              <p className="text-xs text-red-500 mt-1">{formik.errors.slug}</p>
+            )}
           </div>
+
           <DialogFooter>
             <Button
               type="button"

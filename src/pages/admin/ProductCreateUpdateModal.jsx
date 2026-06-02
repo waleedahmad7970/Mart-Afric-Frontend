@@ -66,15 +66,25 @@ const CreateUpdateProductModel = ({ product, setOpen, setEditing, open }) => {
 
   // 2. Initialize values securely (handle objects vs strings)
   const initialValues = {
+    ...product,
+
     name: product?.name || "",
     description: product?.description || "",
     sku: product?.sku || "",
     barcode: product?.barcode || "",
     brand: product?.brand || "",
 
-    // Ensure we only extract the string ID if it's a populated object
-    category: product?.category?._id || product?.category || "",
-    subCategory: product?.subCategory?._id || product?.subCategory || "",
+    category: product?.category?._id
+      ? String(product.category._id)
+      : product?.category
+        ? String(product.category)
+        : "",
+
+    subCategory: product?.subCategory?._id
+      ? String(product.subCategory._id)
+      : product?.subCategory
+        ? String(product.subCategory)
+        : "",
 
     price: product?.price || 0,
     salePrice: product?.salePrice || 0,
@@ -94,7 +104,6 @@ const CreateUpdateProductModel = ({ product, setOpen, setEditing, open }) => {
       carbs: product?.nutritionInfo?.carbs || 0,
       fat: product?.nutritionInfo?.fat || 0,
     },
-    ...product,
   };
 
   const handleThumbnailUpload = async (event, setFieldValue) => {
