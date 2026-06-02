@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
-import { Plus, Upload, ImageIcon } from "lucide-react";
+import { Plus, Upload, ImageIcon, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,25 +24,31 @@ import { useSelector } from "react-redux";
 
 // Validation Schema
 const ProductSchema = Yup.object().shape({
-  name: Yup.string().required("Required"),
-  category: Yup.string().required("Required"),
-  price: Yup.number().min(0, "Must be positive").required("Required"),
-  stock: Yup.number().integer().min(0).required("Required"),
-  description: Yup.string(),
-  sku: Yup.string(),
-  barcode: Yup.string(),
-  brand: Yup.string(),
-  salePrice: Yup.number().min(0),
-  vatEnabled: Yup.boolean(),
-  vatPercentage: Yup.number().min(0),
-  weight: Yup.number().min(0),
-  unit: Yup.string().oneOf(["kg", "g", "litre", "ml", "pack", "piece"]),
-  status: Yup.string().oneOf(["active", "inactive", "out_of_stock"]),
+  image: Yup.string().required("Image is required"),
+  name: Yup.string().required("Name is required"),
+  brand: Yup.string().required("Brand is required"),
+  category: Yup.string().required("Category is required"),
+  subCategory: Yup.string().required("Sub-category is required"),
+  price: Yup.number().min(1, "Must be positive").required("Price is required"),
+  stock: Yup.number().integer().min(1).required("Stock is required"),
+  description: Yup.string().required("Description is required"),
+  sku: Yup.string().required("SKU is required"),
+  barcode: Yup.string().required("Barcode is required"),
+  salePrice: Yup.number().min(1).required("Sale price is required"),
+  vatEnabled: Yup.boolean().required("VAT enabled is required"),
+  vatPercentage: Yup.number().min(1).required("VAT percentage is required"),
+  weight: Yup.number().min(1).required("Weight is required"),
+  unit: Yup.string()
+    .oneOf(["kg", "g", "litre", "ml", "pack", "piece"])
+    .required("Unit is required"),
+  status: Yup.string()
+    .oneOf(["active", "inactive", "out_of_stock"])
+    .required("Status is required"),
   nutritionInfo: Yup.object().shape({
-    calories: Yup.number().min(0),
-    protein: Yup.number().min(0),
-    carbs: Yup.number().min(0),
-    fat: Yup.number().min(0),
+    calories: Yup.number().min(0).required("Calories are required"),
+    protein: Yup.number().min(0).required("Protein is required"),
+    carbs: Yup.number().min(0).required("Carbs are required"),
+    fat: Yup.number().min(0).required("Fat is required"),
   }),
 });
 
@@ -56,6 +62,7 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
   );
   const { categories = [] } = category;
   const { subCategories = [] } = subCategory;
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // 2. Initialize values securely (handle objects vs strings)
   const initialValues = {
@@ -95,9 +102,12 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
     if (!file) return;
 
     setPreview(URL.createObjectURL(file));
+    setIsUploadingImage(true);
     const [res, error] = await productsApis.uploadImage({ file });
-    if (res?.success) {
-      setFieldValue("image", res?.url);
+    setIsUploadingImage(false);
+    const { success, url } = res?.data || {};
+    if (success) {
+      setFieldValue("image", url);
     } else {
       toast.error("Image upload failed");
     }
@@ -164,13 +174,19 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
             touched,
           }) => (
             <Form className="space-y-6 py-4">
+              {console.log("Formik values:", errors, values)}
               {/* Media Section */}
               <div className="space-y-2">
                 <Label>Product Image</Label>
                 <div
-                  className="border-2 border-dashed rounded-xl p-4 hover:bg-muted/50 transition cursor-pointer flex flex-col items-center justify-center gap-2"
+                  className="relative border-2 border-dashed rounded-xl p-4 hover:bg-muted/50 transition cursor-pointer flex flex-col items-center justify-center gap-2"
                   onClick={() => document.getElementById("fileInput").click()}
                 >
+                  {isUploadingImage && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  )}
                   {preview || values?.image ? (
                     <img
                       src={preview || values?.image}
@@ -194,6 +210,9 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                     }
                   />
                 </div>
+                {errors.image && touched.image && (
+                  <span className="text-xs text-red-500">{errors.image}</span>
+                )}
               </div>
 
               {/* Basic Information */}
@@ -221,6 +240,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       onChange={handleChange}
                       placeholder="e.g. Nature Farms"
                     />
+                    {errors.brand && touched.brand && (
+                      <span className="text-xs text-red-500">
+                        {errors.brand}
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label>Status</Label>
@@ -251,7 +275,8 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.category}
                       onValueChange={(val) => {
                         setFieldValue("category", val);
-                        // Optional: clear subCategory when parent category changes
+                        setFieldTouched("category", true);
+
                         setFieldValue("subCategory", "");
                       }}
                     >
@@ -278,7 +303,10 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                     <Label htmlFor="subCategory">Sub-Category</Label>
                     <Select
                       value={values.subCategory}
-                      onValueChange={(val) => setFieldValue("subCategory", val)}
+                      onValueChange={(val) => {
+                        setFieldValue("subCategory", val);
+                        setFieldTouched("subCategory", true);
+                      }}
                       // Optional: Disable if no category is selected yet
                       disabled={!values.category}
                     >
@@ -313,6 +341,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                           )}
                       </SelectContent>
                     </Select>
+                    {errors.subCategory && touched.subCategory && (
+                      <span className="text-xs text-red-500">
+                        {errors.subCategory}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -327,6 +360,9 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                     onChange={handleChange}
                     placeholder="e.g. PRK-001"
                   />
+                  {errors.sku && touched.sku && (
+                    <span className="text-xs text-red-500">{errors.sku}</span>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Barcode</Label>
@@ -336,6 +372,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                     onChange={handleChange}
                     placeholder="Scan or enter barcode"
                   />
+                  {errors.barcode && touched.barcode && (
+                    <span className="text-xs text-red-500">
+                      {errors.barcode}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -352,6 +393,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.price}
                       onChange={handleChange}
                     />
+                    {errors.price && touched.price && (
+                      <span className="text-xs text-red-500">
+                        {errors.price}
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label>Sale Price ($)</Label>
@@ -362,6 +408,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.salePrice}
                       onChange={handleChange}
                     />
+                    {errors.salePrice && touched.salePrice && (
+                      <span className="text-xs text-red-500">
+                        {errors.salePrice}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -388,6 +439,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                         value={values.vatPercentage}
                         onChange={handleChange}
                       />
+                      {errors.vatPercentage && touched.vatPercentage && (
+                        <span className="text-xs text-red-500">
+                          {errors.vatPercentage}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -405,6 +461,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.stock}
                       onChange={handleChange}
                     />
+                    {errors.stock && touched.stock && (
+                      <span className="text-xs text-red-500">
+                        {errors.stock}
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label>Weight</Label>
@@ -414,6 +475,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.weight}
                       onChange={handleChange}
                     />
+                    {errors.weight && touched.weight && (
+                      <span className="text-xs text-red-500">
+                        {errors.weight}
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label>Unit</Label>
@@ -450,6 +516,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                     onChange={handleChange}
                     placeholder="e.g. Sugar, Flour, Water"
                   />
+                  {errors.ingredients && touched.ingredients && (
+                    <span className="text-xs text-red-500">
+                      {errors.ingredients}
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Allergens (Comma Separated)</Label>
@@ -459,6 +530,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                     onChange={handleChange}
                     placeholder="e.g. Nuts, Dairy"
                   />
+                  {errors.allergens && touched.allergens && (
+                    <span className="text-xs text-red-500">
+                      {errors.allergens}
+                    </span>
+                  )}
                 </div>
 
                 <Label className="mt-4 block">
@@ -475,6 +551,12 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.nutritionInfo.calories}
                       onChange={handleChange}
                     />
+                    {errors.nutritionInfo?.calories &&
+                      touched.nutritionInfo?.calories && (
+                        <span className="text-xs text-red-500">
+                          {errors.nutritionInfo.calories}
+                        </span>
+                      )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
@@ -486,6 +568,12 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.nutritionInfo.protein}
                       onChange={handleChange}
                     />
+                    {errors.nutritionInfo?.protein &&
+                      touched.nutritionInfo?.protein && (
+                        <span className="text-xs text-red-500">
+                          {errors.nutritionInfo.protein}
+                        </span>
+                      )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
@@ -497,6 +585,12 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.nutritionInfo.carbs}
                       onChange={handleChange}
                     />
+                    {errors.nutritionInfo?.carbs &&
+                      touched.nutritionInfo?.carbs && (
+                        <span className="text-xs text-red-500">
+                          {errors.nutritionInfo.carbs}
+                        </span>
+                      )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
@@ -508,6 +602,12 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                       value={values.nutritionInfo.fat}
                       onChange={handleChange}
                     />
+                    {errors.nutritionInfo?.fat &&
+                      touched.nutritionInfo?.fat && (
+                        <span className="text-xs text-red-500">
+                          {errors.nutritionInfo.fat}
+                        </span>
+                      )}
                   </div>
                 </div>
               </div>
@@ -522,6 +622,11 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
                   onChange={handleChange}
                   placeholder="Enter full product description..."
                 />
+                {errors.description && touched.description && (
+                  <span className="text-xs text-red-500">
+                    {errors.description}
+                  </span>
+                )}
               </div>
 
               <div className="pt-4 sticky bottom-0 bg-background/80 backdrop-blur-sm pb-2">
