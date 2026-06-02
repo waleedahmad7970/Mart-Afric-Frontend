@@ -187,7 +187,7 @@ const productsApis = {
     const { success, data } = res?.data || {};
 
     if (success) {
-      dispatch(productActions.updateProduct(data));
+      dispatch(adminActions.updateProduct(data));
     }
     if (error) {
       handleFormikErrors(error);
@@ -196,11 +196,14 @@ const productsApis = {
     return [res, error];
   },
   createProduct: async ({ body }) => {
+    const dispatch = getDispatch();
+
     const [res, error] = await api.post("/products", body);
     const { success, data, message } = res?.data || {};
     if (success) {
-      productActions.updateProduct(data);
+      dispatch(adminActions.addProduct(data));
     }
+
     return [res, error];
   },
   getAllProducts: async ({ page, limit }) => {

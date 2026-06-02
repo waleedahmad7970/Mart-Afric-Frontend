@@ -36,7 +36,7 @@ const ProductSchema = Yup.object().shape({
   barcode: Yup.string().required("Barcode is required"),
   salePrice: Yup.number().min(1).required("Sale price is required"),
   vatEnabled: Yup.boolean().required("VAT enabled is required"),
-  vatPercentage: Yup.number().min(1).required("VAT percentage is required"),
+  vatPercentage: Yup.number(),
   weight: Yup.number().min(1).required("Weight is required"),
   unit: Yup.string()
     .oneOf(["kg", "g", "litre", "ml", "pack", "piece"])
@@ -52,7 +52,7 @@ const ProductSchema = Yup.object().shape({
   }),
 });
 
-const CreateUpdateProductModel = ({ product, setOpen, open }) => {
+const CreateUpdateProductModel = ({ product, setOpen, setEditing, open }) => {
   const [preview, setPreview] = useState(product?.image);
 
   // 1. Pull Loaders AND Categories/SubCategories from Redux
@@ -137,14 +137,18 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
         productId: payload._id,
         body: payload,
       });
-      if (res?.data?.success) {
+      const { success } = res?.data || {};
+      if (success) {
         toast.success("Product updated successfully");
+        setEditing({});
         setOpen(false);
       }
     } else {
       const [res, error] = await productsApis.createProduct({ body: payload });
-      if (res?.data?.success) {
+      const { success } = res?.data || {};
+      if (success) {
         toast.success("Product created successfully");
+        setEditing({});
         setOpen(false);
       }
     }
@@ -161,6 +165,7 @@ const CreateUpdateProductModel = ({ product, setOpen, open }) => {
         </DialogHeader>
 
         <Formik
+          enableReinitialize
           initialValues={initialValues}
           validationSchema={ProductSchema}
           onSubmit={handleSubmit}

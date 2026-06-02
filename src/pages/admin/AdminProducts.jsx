@@ -172,6 +172,7 @@ const AdminProducts = () => {
       <CreateUpdateProductModel
         product={editing}
         setOpen={setOpen}
+        setEditing={setEditing}
         open={open}
       />
 
