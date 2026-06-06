@@ -56,6 +56,30 @@ const nav = [
       { to: "/admin/delivery", label: "Delivery" },
     ],
   },
+  {
+    type: "link",
+    to: "/admin/reports",
+    label: "Reports",
+    icon: Sparkles,
+  },
+  {
+    type: "link",
+    to: "/admin/reviews",
+    label: "Reviews",
+    icon: Sparkles,
+  },
+  {
+    type: "link",
+    to: "/admin/blogs",
+    label: "Blogs",
+    icon: Sparkles,
+  },
+  {
+    type: "link",
+    to: "/admin/coupons",
+    label: "Coupons",
+    icon: Sparkles,
+  },
 ];
 
 const AdminLayout = () => {

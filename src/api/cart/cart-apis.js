@@ -4,6 +4,7 @@ import { authActions } from "../../store/slices/auth/slice";
 import { categoriesActions } from "../../store/slices/categories/slice";
 import { uiLoaderActions } from "../../store/slices/loader/slice";
 import { cartActions } from "../../store/slices/cart/slice";
+import { handleFormikErrors } from "../../helpers/helpers";
 const cartApis = {
   addToCart: async (item) => {
     const dispatch = getDispatch();

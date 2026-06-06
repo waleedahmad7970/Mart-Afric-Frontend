@@ -78,7 +78,7 @@ const AdminOrderDetails = () => {
   const badgeStyle = tone[currentStatus] || tone.pending;
 
   return (
-    <div className="space-y-6  pb-10">
+    <div className="container max-w-6xl py-12 lg:py-20 animate-fade-up">
       {/* ================= HEADER ================= */}
       <div className="flex items-center gap-4">
         <Button

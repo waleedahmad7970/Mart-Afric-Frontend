@@ -12,6 +12,9 @@ const checkoutApis = {
     if (res?.data?.success === true) {
       return navigate("/orders");
     }
+    if (error) {
+      handleFormikErrors(error);
+    }
     dispatch(uiLoaderActions.stopLoader("checkoutLoader"));
 
     return [res, error];

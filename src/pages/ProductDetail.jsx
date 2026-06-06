@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
-import { Minus, Plus, Star, ArrowLeft } from "lucide-react";
+import { Minus, Plus, Star, ArrowLeft, PoundSterling } from "lucide-react";
 import { findProduct } from "@/data/products";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
@@ -81,8 +81,9 @@ const ProductDetail = () => {
             </span>
           </div>
 
-          <p className="font-display text-3xl mt-6 tabular-nums">
-            ${price?.toFixed(2)}
+          <p className="font-display flex items-center text-3xl mt-6 tabular-nums">
+            <PoundSterling />
+            {price?.toFixed(2)}
           </p>
 
           <p className="mt-6 text-foreground/80 leading-relaxed">
@@ -115,7 +116,11 @@ const ProductDetail = () => {
               loading={addToCartLoader}
               onClick={() => handleAddToCart()}
             >
-              Add to cart · ${(price * qty).toFixed(2)}
+              Add to cart ·{" "}
+              <div className="flex justify-start items-center">
+                <PoundSterling className="!h-[14px] !w-[14px]" />{" "}
+                {(price * qty).toFixed(2)}
+              </div>
             </Button>
           </div>
 

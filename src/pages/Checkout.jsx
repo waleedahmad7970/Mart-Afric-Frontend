@@ -17,6 +17,8 @@ import {
   Sparkles,
   Info,
   ArrowLeft,
+  PoundSterling,
+  WalletIcon,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -35,13 +37,25 @@ import * as Yup from "yup";
 import cartApis from "../api/cart/cart-apis";
 import ordersApis from "../api/checkout/checkout-apis";
 import checkoutApis from "../api/checkout/checkout-apis";
-const Field = ({ label, icon: Icon, ...props }) => (
+const Field = ({ label, icon: Icon, error, ...props }) => (
   <div className="space-y-1.5">
-    <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+    <Label
+      className={cn(
+        "text-xs uppercase tracking-wider flex items-center gap-1.5",
+        error ? "text-red-500" : "text-muted-foreground",
+      )}
+    >
       {Icon && <Icon className="h-3.5 w-3.5" />}
       {label}
     </Label>
-    <Input {...props} className="h-12 rounded-xl" />
+    <Input
+      {...props}
+      className={cn(
+        "h-12 rounded-xl",
+        error && "border-red-500 focus-visible:ring-red-500",
+      )}
+    />
+    {error && <p className="text-[10px] text-red-500">{error}</p>}
   </div>
 );
 
@@ -71,31 +85,37 @@ const SHIPPING_OPTIONS = [
 
 const PAYMENT_METHODS = [
   {
+    disabled: false,
     id: "card",
     label: "Credit / Debit card",
     icon: CreditCard,
     desc: "Visa, Mastercard, Amex",
   },
   {
+    disabled: false, // Set to false so the user can select it
     id: "wallet",
-    label: "Mobile money",
+    label: "Wallet Balance",
     icon: Wallet,
-    desc: "MTN, Vodafone, AirtelTigo",
+    desc: "Pay using your available wallet funds",
   },
   {
-    id: "bank",
-    label: "Bank transfer",
-    icon: Building2,
-    desc: "Direct deposit",
+    disabled: true,
+    id: "mobile_money",
+    label: "Mobile money",
+    icon: WalletIcon,
+    desc: "MTN, Vodafone, AirtelTigo",
   },
 ];
 
 const Checkout = () => {
   const { items, subtotal, clear } = useCart();
-  const { items: cartItems, total: cartTotal } = useSelector(
-    (state) => state.cart,
-  );
+  const {
+    items: cartItems,
+    total: cartTotal,
+    cart,
+  } = useSelector((state) => state.cart);
 
+  const { appliedPromo = {} } = cart || {};
   const { loaders = {} } = useSelector((state) => state.loader) || {};
   const { checkoutLoader } = loaders || {};
 
@@ -120,29 +140,55 @@ const Checkout = () => {
   const total = subtotal + shippingCost + tax;
 
   const schema = Yup.object({
-    email: Yup.string().email().required("Required"),
-    firstName: Yup.string().required("Required"),
-    address: Yup.string().required("Required"),
-    city: Yup.string().required("Required"),
+    email: Yup.string().email("Invalid email").required("Required"),
+    firstName: Yup.string().required("First name is Required"),
+    lastName: Yup.string().required("Last name is Required"),
+    address: Yup.string().required("address is Required"),
+    city: Yup.string().required("City is Required"),
+
+    // Conditional validation for Card fields
     card: Yup.string().when("payment", {
       is: "card",
-      then: (s) => s.required("Required"),
+      then: (schema) =>
+        schema.min(16, "Must be 16 digits").required("Required"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
+    cardName: Yup.string().when("payment", {
+      is: "card",
+      then: (schema) => schema.required("Required"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
+    exp: Yup.string().when("payment", {
+      is: "card",
+      then: (schema) =>
+        schema
+          .matches(/^(0[1-9]|1[0-2])\/?([0-9]{2})$/, "Invalid format (MM/YY)")
+          .required("Required"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
+    cvc: Yup.string().when("payment", {
+      is: "card",
+      then: (schema) => schema.length(3, "Invalid CVC").required("Required"),
+      otherwise: (schema) => schema.notRequired(),
     }),
   });
 
   const formik = useFormik({
+    enableReinitialize: true,
     initialValues: {
-      email: user?.email || "",
-      firstName: user?.name?.split(" ")[0] || "",
-      lastName: user?.name?.split(" ")[1] || "",
-      phone: "",
-      address: "",
-      apartment: "",
-      city: "",
-      region: "",
-      zip: "",
-      country: "",
-      notes: "",
+      email: user?.shipping?.email || user?.email || "",
+      firstName: user?.shipping?.firstName || user?.name?.split(" ")[0] || "",
+      lastName: user?.shipping?.lastName || user?.name?.split(" ")[1] || "",
+      phone: user?.shipping?.phone || "",
+      address: user?.shipping?.address || "",
+      apartment: user?.shipping?.apartment || "",
+      city: user?.shipping?.city || "",
+      region: user?.shipping?.region || "",
+      zip: user?.shipping?.zip || "",
+      country: user?.shipping?.country || "",
+      notes: user?.shipping?.notes || "",
+
+      // Payment state remains empty by default
       card: "",
       cardName: "",
       exp: "",
@@ -166,12 +212,14 @@ const Checkout = () => {
           country: values.country,
           notes: values.notes,
         },
-
         payment: {
           method: values.payment,
           momoNumber: values.momoNumber,
           cardLast4: values.card?.slice(-4),
         },
+        saveAddress: saveInfo,
+        shippingCost: shippingCost,
+        paymentMethod: payment,
       };
 
       const [res, error] = await checkoutApis.checkout(body, navigate);
@@ -199,6 +247,7 @@ const Checkout = () => {
     );
   }
 
+  console.log("formik values and error", formik.values, formik.errors);
   return (
     <div className="container py-12 lg:py-16">
       {/* Breadcrumb + back */}
@@ -330,6 +379,7 @@ const Checkout = () => {
                   value={formik.values.lastName}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
+                  required
                 />
               </div>
 
@@ -528,23 +578,81 @@ const Checkout = () => {
               </div>
               <ShieldCheck className="h-5 w-5 text-primary" />
             </div>
-
             <RadioGroup
               value={payment}
-              onValueChange={setPayment}
+              onValueChange={(value) => {
+                setPayment(value);
+
+                formik.setFieldValue("payment", value);
+
+                formik.setErrors({});
+                formik.setTouched({});
+
+                setTimeout(() => {
+                  formik.validateForm();
+                }, 0);
+              }}
               className="grid sm:grid-cols-3 gap-3 mb-6"
             >
               {PAYMENT_METHODS.map((m) => {
                 const active = payment === m.id;
+                const isDisabled = m.disabled === true;
+
+                // 1. DIGITAL WALLET CARD (With correct selection border)
+                if (m.id === "wallet") {
+                  return (
+                    <label
+                      key={m.id}
+                      className={`relative cursor-pointer transition-all duration-300 rounded-2xl border-4 overflow-hidden ${
+                        active
+                          ? "border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
+                          : "border-transparent hover:border-primary/20"
+                      }`}
+                    >
+                      <RadioGroupItem
+                        value={m.id}
+                        id={m.id}
+                        className="sr-only"
+                      />
+
+                      {/* Dark Wallet Card Design */}
+                      <div className="relative p-6 bg-[#121212] w-full min-h-[160px] flex flex-col justify-between">
+                        {/* Subtle light hit */}
+                        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+
+                        <div className="relative z-10 flex justify-between items-start">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-medium tracking-widest text-[#A8A8A8] uppercase mb-1">
+                              Store Balance
+                            </span>
+                            <span className="flex items-center text-3xl font-semibold text-white">
+                              £{user?.wallet?.balance || "0.00"}
+                            </span>
+                          </div>
+                          <Wallet
+                            className={`h-6 w-6 transition-colors ${active ? "text-primary" : "text-[#FAFAF2] opacity-80"}`}
+                          />
+                        </div>
+
+                        <div className="relative z-10 pt-4 mt-4 border-t border-[#333]/60">
+                          <p className="text-[10px] text-[#A8A8A8] uppercase tracking-wider">
+                            {active ? "Currently Selected" : "Wallet Active"}
+                          </p>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                }
+
+                // 2. STANDARD CARD (For Cards, Banks, etc.)
                 return (
                   <label
                     key={m.id}
-                    className={cn(
-                      "flex flex-col items-start gap-2 p-4 rounded-2xl border-2 cursor-pointer transition-smooth",
+                    className={`flex flex-col items-start gap-2 p-4 rounded-2xl border-2 cursor-pointer transition-smooth ${
                       active
                         ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/40",
-                    )}
+                        : "border-border hover:border-primary/40"
+                    }`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <m.icon className="h-5 w-5 text-primary" />
@@ -567,6 +675,8 @@ const Checkout = () => {
                   value={formik.values.card}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
+                  // Fix: Add error prop
+                  error={formik.touched.card && formik.errors.card}
                 />
 
                 <Field
@@ -575,6 +685,7 @@ const Checkout = () => {
                   value={formik.values.cardName}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
+                  error={formik.touched.cardName && formik.errors.cardName}
                 />
 
                 <div className="grid grid-cols-2 gap-4">
@@ -585,21 +696,24 @@ const Checkout = () => {
                     value={formik.values.exp}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
+                    error={formik.touched.exp && formik.errors.exp}
                   />
 
                   <Field
+                    type="number"
                     label="CVC"
                     name="cvc"
                     placeholder="•••"
                     value={formik.values.cvc}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
+                    error={formik.touched.cvc && formik.errors.cvc}
                   />
                 </div>
               </div>
             )}
 
-            {payment === "wallet" && (
+            {payment === "transfer" && (
               <div className="grid gap-4">
                 <Field
                   label="Mobile money number"
@@ -661,102 +775,131 @@ const Checkout = () => {
           </section>
         </div>
         {/* RIGHT — sticky summary */}
+        {/* RIGHT — sticky summary */}
         <aside className="lg:sticky lg:top-24 h-fit space-y-5">
           <div className="rounded-3xl bg-card border border-border p-6 md:p-7 shadow-elevated">
             <div className="flex items-center gap-3 mb-5">
               <Package className="h-5 w-5 text-primary" />
-              <h2 className="font-display text-2xl">Your order</h2>
+              <h2 className="font-display text-2xl">Order summary</h2>
             </div>
 
+            {/* Items list (smaller) */}
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1 mb-5">
-              {items.map((i) => (
-                <div key={i.id} className="flex gap-3 text-sm">
+              {cartItems.map((i) => (
+                <div key={i.product?._id} className="flex gap-3 text-sm">
                   <div className="relative h-16 w-16 rounded-xl overflow-hidden bg-secondary shrink-0">
                     <img
-                      src={i.image}
-                      alt={i.name}
+                      src={i.product?.image}
+                      alt={i.product?.name}
                       className="h-full w-full object-cover"
                     />
                     <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-foreground text-background text-[10px] flex items-center justify-center font-medium">
-                      {i.qty}
+                      {i.quantity}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium leading-tight line-clamp-1">
-                      {i.name}
+                      {i.product?.name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      ${i.price.toFixed(2)} each
+                      ${i.product?.price.toFixed(2)} each
                     </p>
                   </div>
                   <p className="tabular-nums font-medium">
-                    ${(i.price * i.qty).toFixed(2)}
+                    ${(i.product?.price * i.quantity).toFixed(2)}
                   </p>
                 </div>
               ))}
             </div>
 
+            {/* Calculations (Matching your Cart logic) */}
             <div className="border-t border-border pt-5 space-y-2.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="tabular-nums">${cartTotal?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shipping</span>
-                <span className="tabular-nums">
-                  {shippingCost === 0 ? "Free" : `$${shippingCost?.toFixed(2)}`}
+                <span className="tabular-nums flex items-center">
+                  <PoundSterling className="h-3.5 w-3.5" />
+                  {cartTotal?.toFixed(2) || "0.00"}
                 </span>
               </div>
+
+              {/* Applied Discount Logic */}
+              {appliedPromo && (
+                <div className="flex justify-between text-primary">
+                  <span>Discount ({appliedPromo.code})</span>
+                  <span className="tabular-nums flex items-center">
+                    -<PoundSterling className="h-3.5 w-3.5" />
+                    {(appliedPromo.type === "fixed"
+                      ? Math.min(appliedPromo.value, cartTotal)
+                      : cartTotal * (appliedPromo.value / 100)
+                    ).toFixed(2)}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax (5%)</span>
-                <span className="tabular-nums">${tax.toFixed(2)}</span>
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="tabular-nums flex items-center">
+                  {shippingCost === 0 ? (
+                    "Free"
+                  ) : (
+                    <>
+                      <PoundSterling className="h-3.5 w-3.5" />
+                      {shippingCost?.toFixed(2)}
+                    </>
+                  )}
+                </span>
               </div>
-              <div className="flex justify-between font-display text-2xl pt-4 border-t border-border mt-3">
+
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  Estimated tax (5%)
+                </span>
+                <span className="tabular-nums flex items-center">
+                  <PoundSterling className="h-3.5 w-3.5" />
+                  {(
+                    (cartTotal -
+                      (appliedPromo
+                        ? appliedPromo.type === "fixed"
+                          ? Math.min(appliedPromo.value, cartTotal)
+                          : cartTotal * (appliedPromo.value / 100)
+                        : 0)) *
+                    0.05
+                  ).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="border-t border-border pt-4 mt-4 flex justify-between font-display text-2xl">
                 <span>Total</span>
-                <span className="tabular-nums">${cartTotal?.toFixed(2)}</span>
+                <span className="tabular-nums flex items-center">
+                  <PoundSterling className="h-6 w-6" />
+                  {/* This matches the exact final total from your cart page */}
+                  {(
+                    cartTotal -
+                    (appliedPromo
+                      ? appliedPromo.type === "fixed"
+                        ? Math.min(appliedPromo.value, cartTotal)
+                        : cartTotal * (appliedPromo.value / 100)
+                      : 0) +
+                    shippingCost +
+                    (cartTotal -
+                      (appliedPromo
+                        ? appliedPromo.type === "fixed"
+                          ? Math.min(appliedPromo.value, cartTotal)
+                          : cartTotal * (appliedPromo.value / 100)
+                        : 0)) *
+                      0.05
+                  ).toFixed(2)}
+                </span>
               </div>
             </div>
 
             <Button
               type="submit"
-              disabled={submitting}
-              loading={checkoutLoader}
+              disabled={formik.isSubmitting || !formik.isValid}
               className="w-full mt-6 rounded-full h-13 py-6 bg-gradient-warm text-primary-foreground shadow-glow text-base"
             >
-              {submitting ? (
-                "Processing…"
-              ) : (
-                <>
-                  <Lock className="h-4 w-4 mr-2" /> Pay ${total.toFixed(2)}
-                </>
-              )}
+              {formik.isSubmitting ? "Processing…" : "Place Order"}
             </Button>
-
-            <p className="text-[11px] text-muted-foreground text-center mt-4 leading-relaxed">
-              By placing your order you agree to our{" "}
-              <Link to="/faq" className="underline hover:text-primary">
-                terms
-              </Link>{" "}
-              and{" "}
-              <Link to="/faq" className="underline hover:text-primary">
-                privacy policy
-              </Link>
-              .
-            </p>
-          </div>
-
-          {/* Trust block */}
-          <div className="rounded-2xl bg-secondary/40 p-5 space-y-3">
-            {[
-              { icon: ShieldCheck, text: "256-bit SSL secured payment" },
-              { icon: Truck, text: "Track your order in real time" },
-              { icon: Sparkles, text: `Earn ${Math.floor(total)} mart points` },
-            ].map((b) => (
-              <div key={b.text} className="flex items-center gap-3 text-sm">
-                <b.icon className="h-4 w-4 text-primary shrink-0" />
-                <span>{b.text}</span>
-              </div>
-            ))}
           </div>
         </aside>
       </form>

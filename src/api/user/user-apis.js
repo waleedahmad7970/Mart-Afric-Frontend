@@ -4,6 +4,17 @@ import { authActions } from "../../store/slices/auth/slice";
 import { uiLoaderActions } from "../../store/slices/loader/slice";
 import { adminActions } from "../../store/slices/admin/slice";
 const userApi = {
+  getMe: async (values) => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("meLoader"));
+    const [res, error] = await api.get("/users/me");
+    dispatch(uiLoaderActions.stopLoader("meLoader"));
+    const { success, data, message } = res?.data || {};
+    if (success) {
+      dispatch(authActions.user(data));
+    }
+    return [res, error];
+  },
   getUsers: async (values) => {
     const dispatch = getDispatch();
     dispatch(uiLoaderActions.startLoader("usersLoader"));
@@ -57,6 +68,14 @@ const userApi = {
     const [res, error] = await api.patch(`/users/password`, values);
     const { success, data, message } = res?.data || {};
     dispatch(uiLoaderActions.stopLoader("updatePasswordLoader"));
+    return [res, error];
+  },
+  updateAddress: async (values) => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("updateAddressLoader"));
+    const [res, error] = await api.put("/users/address", values);
+    dispatch(uiLoaderActions.stopLoader("updateAddressLoader"));
+
     return [res, error];
   },
 };

@@ -65,6 +65,26 @@ const initialState = {
       totalPages: 0,
     },
   },
+  reports: {
+    totalRevenue: 0,
+    totalOrders: 0,
+    averageOrderValue: 0,
+    totalCustomers: 0,
+    chartData: [],
+    topProducts: [],
+  },
+  coupon: {
+    totalCoupons: 0,
+    activeCoupons: 0,
+    totalUsage: 0,
+    coupons: [],
+    couponPagination: {
+      limit: 30,
+      page: 1,
+      total: 0,
+      totalPages: 0,
+    },
+  },
 };
 
 const adminSlice = createSlice({
@@ -139,7 +159,7 @@ const adminSlice = createSlice({
     },
     deleteProduct: (state, action) => {
       state.product.products = state.product.products.filter(
-        (p) => p._id !== action.payload && p.id !== action.payload,
+        (p) => p?._id !== action.payload && p?._id !== action.payload,
       );
     },
 
@@ -281,6 +301,42 @@ const adminSlice = createSlice({
     deleteBrand: (state, action) => {
       state.brand.brands = state.brand.brands.filter(
         (c) => c._id !== action.payload && c.id !== action.payload,
+      );
+    },
+    reportsStats: (state, action) => {
+      state.reports = {
+        ...state.reports,
+        ...action.payload,
+      };
+    },
+    // coupons
+    setCoupons: (state, action) => {
+      if (state.coupon.couponPagination.page === 1) {
+        state.coupon.coupons = action.payload;
+      } else {
+        state.coupon.coupons = [...state.coupon.coupons, ...action.payload];
+      }
+    },
+    setCouponPagination: (state, action) => {
+      state.coupon.couponPagination = {
+        ...state.coupon.couponPagination,
+        ...action.payload,
+      };
+    },
+    addCoupon: (state, action) => {
+      state.coupon.coupons.unshift(action.payload);
+    },
+    updateCoupon: (state, action) => {
+      const index = state.coupon.coupons.findIndex(
+        (c) => c._id === action.payload._id || c._id === action.payload._id,
+      );
+      if (index !== -1) {
+        state.coupon.coupons[index] = action.payload;
+      }
+    },
+    deleteCoupon: (state, action) => {
+      state.coupon.coupons = state.coupon.coupons.filter(
+        (c) => c._id !== action.payload && c._id !== action.payload,
       );
     },
   },

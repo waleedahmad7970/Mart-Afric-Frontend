@@ -16,8 +16,8 @@ import {
   Sparkles,
   Check,
   Info,
+  PoundSterling,
 } from "lucide-react";
-import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,48 +28,53 @@ import { toast } from "sonner";
 import PersonalizedRails from "@/components/PersonalizedRails";
 import { useSelector } from "react-redux";
 import cartApis from "../api/cart/cart-apis";
+import wishlistApis from "../api/wishlist/wishlist-apis";
+import couponApis from "../api/coupon/coupon-apis";
 
 const PROMOS = {
   WELCOME10: { type: "pct", value: 10, label: "10% off" },
-  MART5: { type: "fixed", value: 5, label: "$5 off" },
+  MART5: { type: "fixed", value: 5, label: "£5 off" },
   FREESHIP: { type: "ship", value: 0, label: "Free shipping" },
 };
 
 const FREE_SHIP_THRESHOLD = 60;
 
 const Cart = () => {
-  const { items, remove, setQty, subtotal } = useCart();
-  const { items: cartItems, total: cartTotal } = useSelector(
-    (state) => state.cart,
-  );
-
-  const { updateItemLoader } = useSelector((state) => state.loader.loaders);
   const navigate = useNavigate();
+
+  // Redux State
+  const {
+    items: cartItems,
+    total: cartSubtotal,
+    cart,
+  } = useSelector((state) => state.cart) || {};
+  const { appliedPromo = {} } = cart || {};
+  const { wishlist = null, items: wishlistItems = [] } =
+    useSelector((state) => state.wishlist) || {};
+  const { updateItemLoader, applyCouponLoader } = useSelector(
+    (state) => state.loader.loaders,
+  );
+  // Local State
   const [promo, setPromo] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState(null);
   const [giftWrap, setGiftWrap] = useState(false);
   const [giftNote, setGiftNote] = useState("");
   const [insurance, setInsurance] = useState(false);
+
   useEffect(() => {
     const loadCart = async () => {
       const [res, error] = await cartApis.getCart();
     };
-
     loadCart();
   }, []);
+
   const applyPromo = () => {
     const code = promo.trim().toUpperCase();
-    if (PROMOS[code]) {
-      setAppliedPromo({ code, ...PROMOS[code] });
-      toast.success(`Promo ${code} applied — ${PROMOS[code].label}`);
-    } else {
-      toast.error("Invalid promo code");
-    }
+    const [res, error] = couponApis.appllyCoupon({ code });
   };
 
   const clearPromo = () => {
-    setAppliedPromo(null);
     setPromo("");
+    const [res, error] = couponApis.removeCoupon({});
   };
 
   const handleUpdateItemQty = (productId, quantity) => {
@@ -80,34 +85,58 @@ const Cart = () => {
     cartApis.deletItem({ productId }).then(() => {});
   };
 
+  const onToggleWishlist = async (productId) => {
+    const [res, error] = await wishlistApis.toggleWishlist(productId);
+  };
+
+  const isWishlisted = (productId) => {
+    const wishlistedItemIds = wishlistItems?.map((item) => item?.product?._id);
+    return wishlistedItemIds?.includes(productId);
+  };
+
+  console.log("appliedPromo", appliedPromo);
+  // ==========================================
+  // DYNAMIC CALCULATIONS (Based on Redux Data)
+  // ==========================================
   const discount =
     appliedPromo?.type === "pct"
-      ? subtotal * (appliedPromo.value / 100)
+      ? cartSubtotal * (appliedPromo.value / 100)
       : appliedPromo?.type === "fixed"
-        ? Math.min(appliedPromo.value, subtotal)
+        ? Math.min(appliedPromo.value, cartSubtotal)
         : 0;
 
   const giftFee = giftWrap ? 3.5 : 0;
   const insuranceFee = insurance ? 1.99 : 0;
+
   const baseShipping =
-    subtotal === 0 ? 0 : subtotal - discount > FREE_SHIP_THRESHOLD ? 0 : 6.5;
+    cartSubtotal === 0
+      ? 0
+      : cartSubtotal - discount > FREE_SHIP_THRESHOLD
+        ? 0
+        : 6.5;
   const shipping = appliedPromo?.type === "ship" ? 0 : baseShipping;
-  const tax = (subtotal - discount) * 0.05;
-  const total = Math.max(
+
+  const tax = (cartSubtotal - discount) * 0.05;
+
+  const finalTotal = Math.max(
     0,
-    subtotal - discount + shipping + tax + giftFee + insuranceFee,
+    cartSubtotal - discount + shipping + tax + giftFee + insuranceFee,
   );
 
   const remainingForFreeShip = Math.max(
     0,
-    FREE_SHIP_THRESHOLD - (subtotal - discount),
-  );
-  const shipProgress = Math.min(
-    100,
-    ((subtotal - discount) / FREE_SHIP_THRESHOLD) * 100,
+    FREE_SHIP_THRESHOLD - (cartSubtotal - discount),
   );
 
-  if (cartItems?.length === 0) {
+  const shipProgress = Math.min(
+    100,
+    ((cartSubtotal - discount) / FREE_SHIP_THRESHOLD) * 100,
+  );
+
+  // ==========================================
+  // EMPTY STATE RENDER
+  // ==========================================
+  if (cartItems?.length === 0 || !cartItems) {
     return (
       <div className="container py-20 lg:py-28">
         <div className="max-w-2xl mx-auto text-center">
@@ -150,8 +179,11 @@ const Cart = () => {
     );
   }
 
+  // ==========================================
+  // ACTIVE CART RENDER
+  // ==========================================
   return (
-    <div className="container py-12 lg:py-16">
+    <div className="container py-12 lg:py-16 animate-fade-up">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
         <Link to="/" className="hover:text-primary">
@@ -205,29 +237,77 @@ const Cart = () => {
       </header>
 
       {/* Free shipping progress */}
-      <div className="mb-10 rounded-2xl border border-border bg-secondary/30 p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-            <Truck className="h-4 w-4 text-primary" />
+      {/* INLINE CSS FOR PROCESSING ANIMATION */}
+      <style>{`
+        @keyframes processing-stripes {
+          0% { background-position: 1rem 0; }
+          100% { background-position: 0 0; }
+        }
+      `}</style>
+
+      <div
+        className={`mb-10 rounded-2xl border p-5 transition-all duration-700 ease-in-out ${
+          remainingForFreeShip <= 0
+            ? "border-primary bg-primary/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+            : "border-border bg-secondary/30"
+        }`}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className={`h-9 w-9 rounded-full flex items-center justify-center transition-all duration-500 ${
+              remainingForFreeShip <= 0
+                ? "bg-primary text-primary-foreground scale-110"
+                : "bg-primary/10 text-primary"
+            }`}
+          >
+            <Truck
+              className={`h-4 w-4 transition-transform ${
+                remainingForFreeShip <= 0 ? "animate-bounce" : ""
+              }`}
+            />
           </div>
-          <p className="text-sm flex-1">
+          <p className="text-sm flex-1 transition-all duration-300">
             {remainingForFreeShip > 0 ? (
               <>
                 Add{" "}
-                <strong className="text-primary">
-                  ${remainingForFreeShip.toFixed(2)}
-                </strong>{" "}
+                <span className="text-primary inline-flex items-center font-bold">
+                  <PoundSterling className="h-3.5 w-3.5 mr-0.5" />
+                  {remainingForFreeShip?.toFixed(2)}
+                </span>{" "}
                 more for <strong>FREE shipping</strong>
               </>
             ) : (
-              <>
+              <span className="flex items-center gap-1 animate-in fade-in zoom-in duration-500">
                 <strong className="text-primary">Congrats!</strong> You've
-                unlocked free shipping 🎉
-              </>
+                unlocked free shipping
+                <span className="inline-block animate-bounce origin-bottom text-lg">
+                  🎉
+                </span>
+              </span>
             )}
           </p>
         </div>
-        <Progress value={shipProgress} className="h-2" />
+
+        {/* CUSTOM LIVE "PROCESSING" PROGRESS BAR */}
+        <div className="relative w-full h-2.5 bg-primary/10 rounded-full overflow-hidden shadow-inner">
+          <div
+            className="absolute top-0 left-0 h-full bg-primary transition-all duration-1000 ease-out"
+            style={{ width: `${shipProgress}%` }}
+          >
+            {/* The Moving Stripes Overlay (Only shows while still filling up) */}
+            {remainingForFreeShip > 0 && (
+              <div
+                className="h-full w-full opacity-25"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 50%, #ffffff 50%, #ffffff 75%, transparent 75%, transparent)",
+                  backgroundSize: "1rem 1rem",
+                  animation: "processing-stripes 1s linear infinite",
+                }}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-10 lg:gap-14">
@@ -279,8 +359,9 @@ const Cart = () => {
                           <Truck className="h-3 w-3 mr-1" /> Ships in 24h
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-3 tabular-nums">
-                        ${i?.product?.price?.toFixed(2)} each
+                      <p className="text-sm flex items-center text-muted-foreground mt-3 tabular-nums">
+                        <PoundSterling className="h-3.5 w-3.5" />
+                        {i?.product?.price?.toFixed(2)} each
                       </p>
                       <p className="text-sm text-muted-foreground mt-3 tabular-nums">
                         Quantity: {i?.quantity}
@@ -289,12 +370,28 @@ const Cart = () => {
 
                     <div className="flex flex-wrap items-center gap-4 mt-4">
                       <button
-                        onClick={() => toast.success("Saved for later")}
-                        className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1.5"
+                        type="button"
+                        onClick={() => onToggleWishlist(i?.product?._id)}
+                        className={`text-xs inline-flex items-center gap-1.5 transition-colors hover:text-red-500 ${
+                          isWishlisted(i?.product?._id)
+                            ? "text-red-500"
+                            : "text-muted-foreground"
+                        }`}
                       >
-                        <Heart className="h-3.5 w-3.5" /> Save for later
+                        <Heart
+                          className="h-3.5 w-3.5"
+                          fill={
+                            isWishlisted(i?.product?._id)
+                              ? "currentColor"
+                              : "none"
+                          }
+                        />{" "}
+                        {isWishlisted(i?.product?._id)
+                          ? "Saved"
+                          : "Save for later"}
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleRemoveItem(i?.product?._id)}
                         className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5"
                       >
@@ -306,7 +403,7 @@ const Cart = () => {
                   <div className="flex md:flex-col items-center md:items-end justify-between gap-3 md:w-32">
                     <div className="flex items-center border border-border rounded-full">
                       <Button
-                        disabled={updateItemLoader}
+                        disabled={updateItemLoader || i?.quantity <= 1}
                         variant="ghost"
                         size="icon"
                         className="rounded-full h-9 w-9"
@@ -331,8 +428,9 @@ const Cart = () => {
                         <Plus className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    <p className="font-display text-xl tabular-nums">
-                      ${(i?.product?.price * i?.quantity)?.toFixed(2)}
+                    <p className="font-display flex items-center text-xl tabular-nums">
+                      <PoundSterling className="h-5 w-5" />
+                      {(i?.product?.price * i?.quantity)?.toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -357,7 +455,10 @@ const Cart = () => {
                 <div className="flex-1">
                   <div className="flex justify-between gap-3">
                     <p className="font-medium">Premium gift wrap</p>
-                    <p className="text-sm tabular-nums">+$3.50</p>
+                    <p className="text-sm tabular-nums flex items-center">
+                      +<PoundSterling className="h-3 w-3" />
+                      3.50
+                    </p>
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Hand-wrapped in recycled kraft with a fabric ribbon.
@@ -387,7 +488,10 @@ const Cart = () => {
                       Shipping protection
                       <ShieldCheck className="h-4 w-4 text-primary" />
                     </p>
-                    <p className="text-sm tabular-nums">+$1.99</p>
+                    <p className="text-sm tabular-nums flex items-center">
+                      +<PoundSterling className="h-3 w-3" />
+                      1.99
+                    </p>
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Covers loss, theft and damage in transit.
@@ -437,93 +541,129 @@ const Cart = () => {
             </p>
 
             {/* Promo code */}
+            {/* Promo code */}
             <div className="mb-5">
               <label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                 Promo code
               </label>
+
+              {/* If Redux has an appliedPromo, show the active tag */}
               {appliedPromo ? (
                 <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-primary/10 border border-primary/30">
                   <div className="flex items-center gap-2 text-sm">
                     <Tag className="h-4 w-4 text-primary" />
                     <span className="font-medium">{appliedPromo.code}</span>
                     <span className="text-muted-foreground">
-                      — {appliedPromo.label}
+                      {/* Dynamic label based on the backend data */}—{" "}
+                      {appliedPromo.type === "fixed"
+                        ? `£${appliedPromo.value} off`
+                        : appliedPromo.type === "pct"
+                          ? `${appliedPromo.value}% off`
+                          : "Free Shipping"}
                     </span>
                   </div>
                   <button
                     onClick={clearPromo}
-                    className="text-xs text-muted-foreground hover:text-destructive"
+                    disabled={applyCouponLoader}
+                    className="text-xs text-muted-foreground hover:text-destructive disabled:opacity-50"
                   >
                     Remove
                   </button>
                 </div>
               ) : (
+                /* Otherwise, show the input box */
                 <div className="flex gap-2">
                   <Input
                     placeholder="Enter code"
                     value={promo}
                     onChange={(e) => setPromo(e.target.value)}
                     className="rounded-xl h-11"
+                    disabled={applyCouponLoader} // Disable while loading
                   />
                   <Button
                     onClick={applyPromo}
                     variant="outline"
                     className="rounded-xl h-11 px-5"
+                    disabled={applyCouponLoader || !promo.trim()} // Disable while loading or empty
                   >
-                    Apply
+                    {applyCouponLoader ? "Applying..." : "Apply"}
                   </Button>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                <Info className="h-3 w-3" /> Try{" "}
-                <code className="font-mono">WELCOME10</code> for 10% off
-              </p>
             </div>
-
             {/* Totals */}
             <div className="space-y-2.5 text-sm border-t border-border pt-5">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
-                  Subtotal ({cartItems?.length} item
-                  {items.length === 1 ? "" : "s"})
+                  Subtotal ({cartItems?.length || 0} item
+                  {cartItems?.length === 1 ? "" : "s"})
                 </span>
-                <span className="tabular-nums">${subtotal.toFixed(2)}</span>
+                <span className="tabular-nums flex items-center">
+                  <PoundSterling className="h-3.5 w-3.5" />
+                  {cartSubtotal?.toFixed(2) || "0.00"}
+                </span>
               </div>
+
               {discount > 0 && (
                 <div className="flex justify-between text-primary">
                   <span>Discount</span>
-                  <span className="tabular-nums">−${discount.toFixed(2)}</span>
+                  <span className="tabular-nums flex items-center">
+                    -<PoundSterling className="h-3.5 w-3.5" />
+                    {discount.toFixed(2)}
+                  </span>
                 </div>
               )}
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
-                <span className="tabular-nums">
-                  {shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}
+                <span className="tabular-nums flex items-center">
+                  {shipping === 0 ? (
+                    "Free"
+                  ) : (
+                    <>
+                      <PoundSterling className="h-3.5 w-3.5" />
+                      {shipping.toFixed(2)}
+                    </>
+                  )}
                 </span>
               </div>
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Estimated tax</span>
-                <span className="tabular-nums">${tax.toFixed(2)}</span>
+                <span className="tabular-nums flex items-center">
+                  <PoundSterling className="h-3.5 w-3.5" />
+                  {tax.toFixed(2)}
+                </span>
               </div>
+
               {giftFee > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Gift wrap</span>
-                  <span className="tabular-nums">${giftFee.toFixed(2)}</span>
+                  <span className="tabular-nums flex items-center">
+                    <PoundSterling className="h-3.5 w-3.5" />
+                    {giftFee.toFixed(2)}
+                  </span>
                 </div>
               )}
+
               {insuranceFee > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
                     Shipping protection
                   </span>
-                  <span className="tabular-nums">
-                    ${insuranceFee.toFixed(2)}
+                  <span className="tabular-nums flex items-center">
+                    <PoundSterling className="h-3.5 w-3.5" />
+                    {insuranceFee.toFixed(2)}
                   </span>
                 </div>
               )}
+
               <div className="border-t border-border pt-4 mt-4 flex justify-between font-display text-2xl">
                 <span>Total</span>
-                <span className="tabular-nums">${cartTotal?.toFixed(2)}</span>
+                <span className="tabular-nums flex items-center">
+                  <PoundSterling className="h-6 w-6" />
+                  {finalTotal?.toFixed(2)}
+                </span>
               </div>
             </div>
 
@@ -557,8 +697,8 @@ const Cart = () => {
                 <p className="font-medium text-sm">Member perks active</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   You're earning{" "}
-                  <strong>{Math.floor(cartTotal)} mart points</strong> with this
-                  order.
+                  <strong>{Math.floor(finalTotal)} mart points</strong> with
+                  this order.
                 </p>
               </div>
             </div>

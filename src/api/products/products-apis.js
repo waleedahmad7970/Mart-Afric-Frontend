@@ -233,7 +233,7 @@ const productsApis = {
     const dispatch = getDispatch();
 
     if (success) {
-      dispatch(productActions.deleteProductsFromList(id));
+      dispatch(adminActions.deleteProduct(id));
     }
     return [res, error];
   },
