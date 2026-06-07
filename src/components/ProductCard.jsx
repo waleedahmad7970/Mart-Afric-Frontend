@@ -36,6 +36,7 @@ const ProductCard = ({
     };
     cartApis.addToCart(body);
   };
+  // style={{ background: 'radial-gradient(ellipse at center, #fcf2e3 0%, #f3cf9f 100%)' }}
 
   const regularRetailPrice = product?.salePrice || 0;
   const currentDiscountPrice = product?.discountPrice || 0;

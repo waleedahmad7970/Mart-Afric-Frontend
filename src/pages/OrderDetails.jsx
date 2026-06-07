@@ -173,12 +173,12 @@ const OrderDetails = () => {
             </h3>
             <div className="space-y-2 text-sm">
               <p className="font-medium capitalize flex items-center gap-2">
-                {order.payment.method}{" "}
+                {order?.payment?.method}{" "}
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               </p>
-              {order.payment.cardLast4 && (
+              {order?.payment?.cardLast4 && (
                 <p className="text-muted-foreground">
-                  Card ending in •••• {order.payment.cardLast4}
+                  Card ending in •••• {order?.payment?.cardLast4}
                 </p>
               )}
             </div>
