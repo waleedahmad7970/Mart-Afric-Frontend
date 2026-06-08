@@ -23,6 +23,23 @@ const aiSuggestionApis = {
     dispatch(uiLoaderActions.stopLoader("smartSearchLoader"));
     return [res, error];
   },
+  aiChatText: async (message) => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("aiLoader"));
+    const [res, error] = await api.post("/assistant/text", { message });
+    dispatch(uiLoaderActions.stopLoader("aiLoader"));
+    return [res, error];
+  },
+
+  aiChatVoice: async (formData) => {
+    const dispatch = getDispatch();
+    dispatch(uiLoaderActions.startLoader("aiLoader"));
+    const [res, error] = await api.post("/assistant/voice", formData, {
+      headers: { "Content-Type": undefined }, // let browser set boundary
+    });
+    dispatch(uiLoaderActions.stopLoader("aiLoader"));
+    return [res, error];
+  },
 };
 
 export default aiSuggestionApis;

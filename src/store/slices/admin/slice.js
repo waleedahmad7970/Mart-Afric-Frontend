@@ -85,6 +85,15 @@ const initialState = {
       totalPages: 0,
     },
   },
+  review: {
+    reviews: [],
+    reviewPagination: {
+      limit: 30,
+      page: 1,
+      total: 0,
+      totalPages: 0,
+    },
+  },
 };
 
 const adminSlice = createSlice({
@@ -336,6 +345,37 @@ const adminSlice = createSlice({
     },
     deleteCoupon: (state, action) => {
       state.coupon.coupons = state.coupon.coupons.filter(
+        (c) => c._id !== action.payload && c._id !== action.payload,
+      );
+    },
+    // reviews
+
+    setReviews: (state, action) => {
+      if (state.review.reviewPagination.page === 1) {
+        state.review.reviews = action.payload;
+      } else {
+        state.review.reviews = [...state.review.reviews, ...action.payload];
+      }
+    },
+    setReviewPagination: (state, action) => {
+      state.review.reviewPagination = {
+        ...state.review.reviewPagination,
+        ...action.payload,
+      };
+    },
+    addReview: (state, action) => {
+      state.review.reviews.unshift(action.payload);
+    },
+    updateReview: (state, action) => {
+      const index = state.review.reviews.findIndex(
+        (c) => c._id === action.payload._id || c._id === action.payload._id,
+      );
+      if (index !== -1) {
+        state.review.reviews[index] = action.payload;
+      }
+    },
+    deleteReview: (state, action) => {
+      state.review.reviews = state.review.reviews.filter(
         (c) => c._id !== action.payload && c._id !== action.payload,
       );
     },

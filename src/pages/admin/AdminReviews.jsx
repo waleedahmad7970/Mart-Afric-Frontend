@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea"; // <-- Added Textarea import
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -23,13 +23,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-
-// import reviewApis from "../../api/reviews/review-apis";
-// import productsApis from "../../api/products/products-apis";
+import reviewsApis from "../../api/reviews/reviews-apis";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import productsApis from "../../api/products/products-apis";
+import { useSelector } from "react-redux";
+import useDebounce from "../../hooks/debouce";
 
 const AdminReviews = () => {
-  const [reviews, setReviews] = useState([]);
-  const [products, setProducts] = useState([]); // Stores products for the dropdown
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     search: "",
@@ -37,102 +39,71 @@ const AdminReviews = () => {
     sort: "newest",
   });
 
-  // --- NEW: Add Review Modal States ---
+  const { review = {} } = useSelector((state) => state.admin);
+  const { reviewPagination = {}, reviews = [] } = review || {};
+
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
-  const [newReview, setNewReview] = useState({
-    productId: "",
-    rating: 0,
-    title: "",
-    comment: "",
-  });
 
   useEffect(() => {
-    fetchReviews();
-    fetchProducts(); // Fetch products so we can select them in the modal
+    fetchProducts();
   }, [filters]);
 
   const fetchProducts = async () => {
-    // NOTE: Replace with your actual API call to get a list of products
-    // const [res] = await productsApis.getAllProducts();
-    // if (res?.data) setProducts(res.data);
-
-    // DUMMY PRODUCTS FOR THE DROPDOWN
-    setProducts([
-      { _id: "p1", name: "Premium Wireless Headphones" },
-      { _id: "p2", name: "Smart Fitness Watch" },
-      { _id: "p3", name: "Organic Face Cleanser" },
-    ]);
-  };
-
-  const fetchReviews = async () => {
-    setLoading(true);
-    try {
-      // NOTE: Replace with actual API call
-      // const [res, err] = await reviewApis.getAllReviews(filters);
-      // if (res?.data) setReviews(res.data);
-
-      setTimeout(() => {
-        setReviews([
-          {
-            _id: "r1",
-            user: { name: "Sarah Jenkins", email: "sarah@example.com" },
-            product: {
-              name: "Premium Wireless Headphones",
-              image: "https://via.placeholder.com/150",
-            },
-            rating: 5,
-            title: "Absolutely fantastic!",
-            comment:
-              "The sound quality is amazing and the battery lasts for days.",
-            createdAt: "2026-06-01T10:30:00Z",
-          },
-        ]);
-        setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error(error);
-      setLoading(false);
+    const [res, error] = await productsApis.getAdminProducts({ limit: 500 });
+    const { success, data } = res?.data || {};
+    if (success) {
+      setProducts(data);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this review?")) return;
-    try {
-      // await reviewApis.deleteReview(id);
-      setReviews((prev) => prev.filter((r) => r._id !== id));
-      toast.success("Review deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete review");
-    }
+    await reviewsApis.deleteReview({ id });
   };
 
-  // --- NEW: Handle Form Submit ---
-  const handleAddReview = async (e) => {
-    e.preventDefault();
-    if (!newReview.productId) return toast.error("Please select a product");
-    if (newReview.rating === 0)
-      return toast.error("Please select a star rating");
-    if (!newReview.comment.trim()) return toast.error("Please write a comment");
+  // --- FORMIK SETUP ---
+  const formik = useFormik({
+    initialValues: {
+      product: "",
+      rating: 0,
+      title: "",
+      comment: "",
+    },
+    validationSchema: Yup.object({
+      product: Yup.string().required("Please select a product"),
+      rating: Yup.number()
+        .min(1, "Please select a star rating")
+        .required("Rating is required"),
+      title: Yup.string(),
+      comment: Yup.string().required("Please write a comment").trim(),
+    }),
+    onSubmit: async (values, { setSubmitting, resetForm }) => {
+      try {
+        const [res, error] = await reviewsApis.createReview(values);
+        const { data, success } = res?.data || {};
+        if (success) {
+          toast.success("Review added successfully");
+          setIsModalOpen(false);
+          resetForm();
+          reviewsApis.getAllReviews({
+            search: filters.search,
+            rating: filters.rating,
+            sort: filters.sort,
+          });
+        }
+      } catch (error) {
+        toast.error("Failed to add review");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
 
-    setIsSubmitting(true);
-    try {
-      // NOTE: Replace with actual API call
-      // await reviewApis.submitReview(newReview);
-
-      // Simulate API Delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      toast.success("Review successfully attached to product!");
-      setIsModalOpen(false);
-      setNewReview({ productId: "", rating: 0, title: "", comment: "" }); // Reset form
-      fetchReviews(); // Refresh the table
-    } catch (error) {
-      toast.error("Failed to add review");
-    } finally {
-      setIsSubmitting(false);
-    }
+  // Helper to close modal and reset form
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    formik.resetForm();
+    setHoverRating(0);
   };
 
   const renderStars = (rating) => {
@@ -160,6 +131,17 @@ const AdminReviews = () => {
         ).toFixed(1)
       : 0;
   const fiveStarCount = reviews.filter((r) => r.rating === 5).length;
+  const debouncedQ = useDebounce(filters.search, 600);
+
+  useEffect(() => {
+    fetchProducts();
+
+    reviewsApis.getAllReviews({
+      search: debouncedQ,
+      rating: filters.rating,
+      sort: filters.sort,
+    });
+  }, [debouncedQ, filters.rating, filters.sort]);
 
   return (
     <div className="space-y-6 animate-fade-up relative">
@@ -174,7 +156,6 @@ const AdminReviews = () => {
           </p>
         </div>
 
-        {/* NEW ADD BUTTON */}
         <Button
           onClick={() => setIsModalOpen(true)}
           className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2"
@@ -185,7 +166,6 @@ const AdminReviews = () => {
 
       {/* STATS OVERVIEW */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* ... (Your existing Stats Cards) ... */}
         <div className="bg-card border border-border rounded-2xl p-6 flex items-center justify-between shadow-sm">
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -372,12 +352,11 @@ const AdminReviews = () => {
       </div>
 
       {/* ==========================================
-          ADD REVIEW MODAL OVERLAY
+          ADD REVIEW MODAL OVERLAY (FORMIK)
       ========================================== */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-2xl shadow-lg w-full max-w-lg overflow-hidden animate-fade-up">
-            {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-border">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">
@@ -387,42 +366,46 @@ const AdminReviews = () => {
                   Attach a custom review to a product.
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsModalOpen(false)}
-              >
+              <Button variant="ghost" size="icon" onClick={handleCloseModal}>
                 <X className="h-5 w-5 text-muted-foreground hover:text-foreground" />
               </Button>
             </div>
 
-            {/* Modal Form Body */}
-            <form onSubmit={handleAddReview} className="p-6 space-y-6">
-              {/* Product Selector */}
+            {/* Connect Formik handleSubmit */}
+            <form onSubmit={formik.handleSubmit} className="p-6 space-y-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   Target Product <span className="text-red-500">*</span>
                 </label>
                 <Select
-                  value={newReview.productId}
-                  onValueChange={(val) =>
-                    setNewReview((prev) => ({ ...prev, productId: val }))
-                  }
+                  name="product"
+                  value={formik.values.product}
+                  onValueChange={(val) => formik.setFieldValue("product", val)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    className={
+                      formik.touched.product && formik.errors.product
+                        ? "border-red-500"
+                        : ""
+                    }
+                  >
                     <SelectValue placeholder="Select a product..." />
                   </SelectTrigger>
                   <SelectContent>
                     {products.map((prod) => (
-                      <SelectItem key={prod._id} value={prod._id}>
-                        {prod.name}
+                      <SelectItem key={prod?._id} value={prod?._id}>
+                        {prod?.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {formik.touched.product && formik.errors.product && (
+                  <p className="text-xs text-red-500">
+                    {formik.errors.product}
+                  </p>
+                )}
               </div>
 
-              {/* Interactive Stars */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   Rating <span className="text-red-500">*</span>
@@ -433,15 +416,13 @@ const AdminReviews = () => {
                       key={star}
                       type="button"
                       className="p-1 transition-transform hover:scale-110 focus:outline-none"
-                      onClick={() =>
-                        setNewReview((prev) => ({ ...prev, rating: star }))
-                      }
+                      onClick={() => formik.setFieldValue("rating", star)}
                       onMouseEnter={() => setHoverRating(star)}
                       onMouseLeave={() => setHoverRating(0)}
                     >
                       <Star
                         className={`w-7 h-7 transition-colors duration-200 ${
-                          (hoverRating || newReview.rating) >= star
+                          (hoverRating || formik.values.rating) >= star
                             ? "fill-amber-400 text-amber-400"
                             : "fill-muted text-muted-foreground/30"
                         }`}
@@ -449,56 +430,61 @@ const AdminReviews = () => {
                     </button>
                   ))}
                   <span className="ml-2 text-sm font-medium text-muted-foreground">
-                    {newReview.rating > 0 ? `${newReview.rating} Stars` : ""}
+                    {formik.values.rating > 0
+                      ? `${formik.values.rating} Stars`
+                      : ""}
                   </span>
                 </div>
+                {formik.touched.rating && formik.errors.rating && (
+                  <p className="text-xs text-red-500">{formik.errors.rating}</p>
+                )}
               </div>
 
-              {/* Title Input */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Review Title</label>
                 <Input
+                  name="title"
                   placeholder="e.g., Amazing Quality!"
-                  value={newReview.title}
-                  onChange={(e) =>
-                    setNewReview((prev) => ({ ...prev, title: e.target.value }))
-                  }
+                  value={formik.values.title}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
               </div>
 
-              {/* Comment Textarea */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   Comment <span className="text-red-500">*</span>
                 </label>
                 <Textarea
+                  name="comment"
                   placeholder="Write the customer's feedback here..."
-                  className="resize-y min-h-[100px]"
-                  value={newReview.comment}
-                  onChange={(e) =>
-                    setNewReview((prev) => ({
-                      ...prev,
-                      comment: e.target.value,
-                    }))
-                  }
+                  className={`resize-y min-h-[100px] ${formik.touched.comment && formik.errors.comment ? "border-red-500" : ""}`}
+                  value={formik.values.comment}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
+                {formik.touched.comment && formik.errors.comment && (
+                  <p className="text-xs text-red-500">
+                    {formik.errors.comment}
+                  </p>
+                )}
               </div>
 
-              {/* Modal Footer Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                 >
                   Cancel
                 </Button>
+                {/* Use formik.isSubmitting for loading state */}
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={formik.isSubmitting}
                   className="rounded-full"
                 >
-                  {isSubmitting ? (
+                  {formik.isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
                       Saving...
