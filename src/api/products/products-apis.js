@@ -237,6 +237,30 @@ const productsApis = {
     }
     return [res, error];
   },
+  uploadBulkProducts: async (formData) => {
+    const [res, error] = await api.post(`/products/bulk-upload`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    const { success, data, message } = res?.data || {};
+    if (error) {
+      handleFormikErrors(error);
+    }
+    return [res, error];
+  },
+  bulkPropertyUpdate: async (payload) => {
+    const [res, error] = await api.post(
+      `/products/bulk-property-update`,
+      payload,
+    );
+    const { success, data, message } = res?.data || {};
+    if (error) {
+      handleFormikErrors(error);
+    }
+    return [res, error];
+  },
 };
 
 export default productsApis;

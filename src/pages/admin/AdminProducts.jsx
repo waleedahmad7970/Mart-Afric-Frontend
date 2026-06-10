@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Plus,
@@ -11,6 +11,7 @@ import {
   XCircle,
   AlertTriangle,
   TrendingUp,
+  SlidersHorizontal,
 } from "lucide-react";
 import InfiniteScroll from "react-infinite-scroll-component";
 
@@ -28,6 +29,7 @@ import {
 import { productActions } from "../../store/slices/product/slice";
 import productsApis from "../../api/products/products-apis";
 import CreateUpdateProductModel from "./ProductCreateUpdateModal";
+import BulkPropertyUpdateModal from "./BulkPropertyUpdateModal";
 import useDebounce from "../../hooks/debouce";
 import categoriesApis from "../../api/categories/categories-apis";
 import { adminActions } from "../../store/slices/admin/slice";
@@ -47,7 +49,11 @@ const AdminProducts = () => {
   const { page, totalPages, limit } = productsPagination || {};
 
   const [open, setOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState({});
+
+  // --- THE FIX: Create a strict lock to prevent InfiniteScroll from spamming APIs ---
+  const isFetchingRef = useRef(false);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -62,11 +68,10 @@ const AdminProducts = () => {
   const debouncedSku = useDebounce(filters.sku, 500);
   const debouncedBrand = useDebounce(filters.brand, 500);
 
-  // 1. Fetch Products Effect
-  useEffect(() => {
+  const triggerCatalogRefresh = () => {
     productsApis.getAdminProducts({
       limit: limit,
-      page: page,
+      page: 1,
       search: debouncedSearchTerm,
       sku: debouncedSku,
       brand: debouncedBrand,
@@ -76,6 +81,33 @@ const AdminProducts = () => {
       stock: filters.stock,
       sort: filters.sort,
     });
+    productsApis.getProductsStats({});
+  };
+
+  // 1. Fetch Products Effect WITH THE REF LOCK
+  useEffect(() => {
+    const fetchTableData = async () => {
+      // Lock the fetching engine
+      isFetchingRef.current = true;
+
+      await productsApis.getAdminProducts({
+        limit: limit,
+        page: page,
+        search: debouncedSearchTerm,
+        sku: debouncedSku,
+        brand: debouncedBrand,
+        category: filters.category !== "all" ? filters.category : undefined,
+        subCategory:
+          filters.subCategory !== "all" ? filters.subCategory : undefined,
+        stock: filters.stock,
+        sort: filters.sort,
+      });
+
+      // Unlock the fetching engine once the data is safely in Redux
+      isFetchingRef.current = false;
+    };
+
+    fetchTableData();
   }, [
     page,
     limit,
@@ -108,8 +140,8 @@ const AdminProducts = () => {
   }, [dispatch]);
 
   const fetchNextPage = () => {
-    if (page < totalPages) {
-      console.log("fetching next page", page + 1);
+    // THE FIX: Check the lock before dispatching a new page request
+    if (page < totalPages && !isFetchingRef.current) {
       dispatch(adminActions.setProductsPagination({ page: page + 1 }));
     }
   };
@@ -117,23 +149,6 @@ const AdminProducts = () => {
   const handleDelete = (id) => {
     productsApis.deleteProduct({ id });
   };
-
-  // Safely extract unique Categories and SubCategories as Objects { id, name }
-  const uniqueCategories = Array.from(
-    new Map(
-      products
-        .filter((p) => p?.category?._id)
-        .map((p) => [p.category._id, p.category.name]),
-    ).entries(),
-  ).map(([id, name]) => ({ id, name }));
-
-  const uniqueSubCategories = Array.from(
-    new Map(
-      products
-        .filter((p) => p?.subCategory?._id)
-        .map((p) => [p.subCategory._id, p.subCategory.name]),
-    ).entries(),
-  ).map(([id, name]) => ({ id, name }));
 
   const filteredProducts = products;
 
@@ -176,6 +191,12 @@ const AdminProducts = () => {
         open={open}
       />
 
+      <BulkPropertyUpdateModal
+        open={bulkOpen}
+        setOpen={setBulkOpen}
+        onRefreshList={triggerCatalogRefresh}
+      />
+
       {/* Top Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -184,15 +205,24 @@ const AdminProducts = () => {
             Manage products, inventory and orders.
           </p>
         </div>
-        <Button
-          className="rounded-full"
-          onClick={() => {
-            setEditing({});
-            setOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4 mr-1" /> New Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="rounded-full flex items-center gap-1 border-primary text-primary hover:bg-primary/5"
+            onClick={() => setBulkOpen(true)}
+          >
+            <SlidersHorizontal className="h-4 w-4" /> Bulk Group Edit
+          </Button>
+          <Button
+            className="rounded-full"
+            onClick={() => {
+              setEditing({});
+              setOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-1" /> New Product
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -221,7 +251,6 @@ const AdminProducts = () => {
       {/* Filters Grid */}
       <div className="bg-card border border-border rounded-2xl p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          {/* Search Inputs */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -256,7 +285,6 @@ const AdminProducts = () => {
             />
           </div>
 
-          {/* Category */}
           <Select
             value={filters.category}
             onValueChange={(val) =>
@@ -276,7 +304,6 @@ const AdminProducts = () => {
             </SelectContent>
           </Select>
 
-          {/* Sub Category */}
           <Select
             value={filters.subCategory}
             onValueChange={(val) =>
@@ -296,7 +323,6 @@ const AdminProducts = () => {
             </SelectContent>
           </Select>
 
-          {/* Stock */}
           <Select
             value={filters.stock}
             onValueChange={(val) => setFilters((p) => ({ ...p, stock: val }))}
@@ -312,7 +338,6 @@ const AdminProducts = () => {
             </SelectContent>
           </Select>
 
-          {/* Sort */}
           <Select
             value={filters.sort}
             onValueChange={(val) => setFilters((p) => ({ ...p, sort: val }))}
@@ -377,11 +402,10 @@ const AdminProducts = () => {
         )}
       </div>
 
-      {/* table */}
-      {/* table */}
+      {/* Table Section */}
       <div
         id="scrollableTableContainer"
-        className="bg-card border border-border rounded-2xl overflow-auto scrollbar-hide h-[70vh] relative scrollbar-hide"
+        className="bg-card border border-border rounded-2xl overflow-auto h-[70vh] relative scrollbar-hide"
       >
         <InfiniteScroll
           dataLength={filteredProducts.length}
@@ -400,53 +424,34 @@ const AdminProducts = () => {
           }
         >
           <table className="w-full min-w-[1600px] text-sm whitespace-nowrap">
-            {/* table header */}
             <thead className="sticky top-0 z-30 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
-              {" "}
               <tr>
-                <th className="text-left p-4 whitespace-nowrap">Product</th>
-                <th className="text-left p-4 whitespace-nowrap">SKU</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Brand</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Category</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Price</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Sale Price</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Stock</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Status</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Unit</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Weight</th>
-
-                <th className="text-left p-4 whitespace-nowrap">VAT</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Views</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Sold</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Rating</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Origin</th>
-
-                <th className="text-left p-4 whitespace-nowrap">Updated</th>
-
+                <th className="text-left p-4">Product</th>
+                <th className="text-left p-4">SKU</th>
+                <th className="text-left p-4">Brand</th>
+                <th className="text-left p-4">Category</th>
+                <th className="text-left p-4">Price</th>
+                <th className="text-left p-4">Sale Price</th>
+                <th className="text-left p-4">Stock</th>
+                <th className="text-left p-4">Status</th>
+                <th className="text-left p-4">Unit</th>
+                <th className="text-left p-4">Weight</th>
+                <th className="text-left p-4">VAT</th>
+                <th className="text-left p-4">Views</th>
+                <th className="text-left p-4">Sold</th>
+                <th className="text-left p-4">Rating</th>
+                <th className="text-left p-4">Origin</th>
+                <th className="text-left p-4">Updated</th>
                 <th className="p-4"></th>
               </tr>
             </thead>
 
-            {/* table body */}
             <tbody className="divide-y divide-border">
               {filteredProducts?.map((p) => (
                 <tr
                   key={p?._id}
                   className="hover:bg-muted/30 transition-colors"
                 >
-                  {/* product */}
                   <td className="p-4 min-w-[260px]">
                     <div className="flex items-center gap-3">
                       <div className="h-12 w-12 rounded-xl overflow-hidden bg-secondary border border-border shrink-0">
@@ -456,41 +461,27 @@ const AdminProducts = () => {
                           className="h-full w-full object-cover"
                         />
                       </div>
-
                       <div>
-                        <p className="font-medium whitespace-nowrap">
-                          {p.name}
-                        </p>
-
+                        <p className="font-medium">{p.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {p.tagline}
                         </p>
                       </div>
                     </div>
                   </td>
-                  <td className="p-4">{p?.sku || 0}</td>
-
-                  {/* brand */}
+                  <td className="p-4">{p?.sku || "-"}</td>
                   <td className="p-4">{p?.brand || "-"}</td>
-
-                  {/* category */}
                   <td className="p-4 capitalize">
                     <Badge variant="outline" className="rounded-full">
                       {p?.category?.name || "-"}
                     </Badge>
                   </td>
-
-                  {/* price */}
                   <td className="p-4 tabular-nums font-medium">
                     ${p.price?.toFixed(2)}
                   </td>
-
-                  {/* sale price */}
                   <td className="p-4 tabular-nums">
                     {p?.salePrice > 0 ? `$${p.salePrice?.toFixed(2)}` : "-"}
                   </td>
-
-                  {/* stock */}
                   <td className="p-4">
                     {p?.stock < 10 ? (
                       <Badge variant="secondary" className="rounded-full">
@@ -505,8 +496,6 @@ const AdminProducts = () => {
                       </Badge>
                     )}
                   </td>
-
-                  {/* status */}
                   <td className="p-4">
                     <Badge
                       variant={
@@ -521,36 +510,18 @@ const AdminProducts = () => {
                       {p?.status || "-"}
                     </Badge>
                   </td>
-
-                  {/* unit */}
                   <td className="p-4 capitalize">{p?.unit || "-"}</td>
-
-                  {/* weight */}
                   <td className="p-4">{p?.weight || 0}</td>
-
-                  {/* vat */}
                   <td className="p-4">
                     {p?.vatEnabled ? `${p?.vatPercentage}%` : "No VAT"}
                   </td>
-
-                  {/* views */}
                   <td className="p-4">{p?.views || 0}</td>
-
-                  {/* sold */}
                   <td className="p-4">{p?.sold || 0}</td>
-
-                  {/* rating */}
                   <td className="p-4">{p?.rating || "-"}</td>
-
-                  {/* origin */}
                   <td className="p-4">{p?.origin || "-"}</td>
-
-                  {/* updated */}
-                  <td className="p-4 whitespace-nowrap">
+                  <td className="p-4">
                     {new Date(p?.updatedAt).toLocaleDateString()}
                   </td>
-
-                  {/* actions */}
                   <td className="p-4">
                     <div className="flex items-center justify-end">
                       <Button
@@ -563,7 +534,6 @@ const AdminProducts = () => {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-
                       <Button
                         variant="ghost"
                         size="icon"

@@ -38,7 +38,8 @@ const nav = [
       { to: "/admin/products", label: "Products" },
       { to: "/admin/categories", label: "Categories" },
       { to: "/admin/inventory", label: "Inventory" },
-      { to: "/admin/custom-product-section", label: "Custom Sections" }, // <-- Your new page!
+      { to: "/admin/custom-product-section", label: "Custom Sections" },
+      { to: "/admin/bulk-upload", label: "Bulk Upload" },
     ],
   },
 

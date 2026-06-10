@@ -189,6 +189,7 @@ const CreateUpdateProductModel = ({ product, setOpen, setEditing, open }) => {
             setFieldValue,
             isSubmitting,
             errors,
+            setFieldTouched,
             touched,
           }) => (
             <Form className="space-y-6 py-4">

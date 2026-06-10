@@ -35,6 +35,7 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminReviews from "./pages/admin/AdminReviews";
 
+import AdminBulkUpload from "./pages/admin/AdminBulkUpload";
 import OrderDetails from "./pages/OrderDetails";
 import AdminOrderDetails from "./pages/admin/AdminOrderDetails";
 import CustomSectionsManager from "./pages/admin/sections/CustomSectionsManager";
@@ -102,6 +103,7 @@ const App = () => {
                   <Route path="reports" element={<AdminReports/>} />
                   <Route path="reviews" element={<AdminReviews />} />
                   <Route path="blogs" element={<AdminBlogs />} />
+                  <Route path="bulk-upload" element={<AdminBulkUpload />} />
                   <Route path="coupons" element={<AdminCreateCoupon />} />
                 </Route>
 
